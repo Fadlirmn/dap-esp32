@@ -2,6 +2,7 @@
 // to draw and what to focus-ring; input.cpp/touch.cpp write it in response to events.
 #pragma once
 #include <Arduino.h>
+#include "pins.h"  // ENABLE_TOUCH must be defined before the #if ENABLE_TOUCH guards below
 
 enum UIState {
     STATE_MENU,
