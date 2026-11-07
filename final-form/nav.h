@@ -15,9 +15,35 @@ enum UIState {
     STATE_PLAYBACK_SETTINGS,
     STATE_INFO,
     STATE_RESET_CONFIRM,
-    STATE_THEME_SETTINGS
+    STATE_THEME_SETTINGS,
+    STATE_PLAYLISTS,
+    STATE_PLAYLIST_DETAIL,
+    STATE_MODE_SELECT,      // mockup's "MENU" screen: pick which operating mode is active
+    STATE_MODE_SWITCHING,   // "Beralih mode" transition screen shown just before ESP.restart()
+    STATE_BT_RECEIVER,      // phone audio -> wired IEM (A2DP sink)
+    STATE_TRANSFER_FILE     // WiFi AP + HTTP upload onto the SD card
 };
 extern UIState currentState;
+
+// One mode is active per boot; switching modes saves the choice and restarts
+// (see selectOperatingMode()). BT_TRANSMITTER is today's whole existing app
+// (SD -> A2DP source -> headset) under its mockup name, so it reuses
+// STATE_MENU/STATE_PLAYER/etc. unchanged; LOCAL_PLAYER reuses the same UI but
+// outputs over the I2S DAC (audio_decoder.cpp) instead of A2DP.
+enum OperatingMode : uint8_t { MODE_LOCAL_PLAYER, MODE_BT_RECEIVER, MODE_BT_TRANSMITTER, MODE_TRANSFER_FILE };
+extern OperatingMode operatingMode;  // set from Preferences("mode_pref") before setup() inits anything else
+
+void loadOperatingMode();                 // call first in setup(), before any subsystem init
+UIState homeStateForMode();                // STATE_MENU, or the active mode's own dedicated screen
+void enterModeSelect();                   // MENU long-press, from anywhere: open STATE_MODE_SELECT
+void selectOperatingMode(OperatingMode m);  // confirm: persists pref, shows STATE_MODE_SWITCHING, ESP.restart()
+
+// Floating auto-hiding volume overlay: any screen can show it over itself
+// while the encoder is being turned; checkVolumeOverlayTimeout() (called every
+// loop() tick, like checkScreenTimeout()) clears it ~1.5s after rotation stops.
+constexpr unsigned long VOLUME_OVERLAY_MS = 1500;
+extern unsigned long lastVolumeChangeAt;  // 0 = overlay hidden
+void checkVolumeOverlayTimeout();
 
 // Single shared cursor: only one screen is visible at a time, so one index
 // (reset on state entry) is enough to track "which item is focused" for every
@@ -28,6 +54,7 @@ extern int focusIndex;
 
 extern int trackList_currentPage;
 extern int likesList_currentPage;
+extern int playlist_selectedIndex;  // which playlist STATE_PLAYLIST_DETAIL is showing (index into playlist.h's playlistNames)
 
 // Screen settings. Brightness dropped: backlight is hard-wired to 3V3, no PWM pin
 // available (see pins.h). Timeout is the only screen setting left.
@@ -46,7 +73,8 @@ void handleEncoderDoubleClick();       // Player = next track
 void handleEncoderLongPress();         // Player = toggle like
 void handlePrevButton();               // move focus up / Player = prev track
 void handleNextButton();               // move focus down / Player = next track
-void handleMenuButton();               // open menu / back (reproduces original per-screen back targets)
+void handleMenuButton();               // short press: open menu / back (reproduces original per-screen back targets)
+void handleMenuLongPress();            // long press: open STATE_MODE_SELECT from anywhere
 
 #if ENABLE_TOUCH
 void processGlobalTouch(int x, int y);  // optional secondary input path, same actions

@@ -3,6 +3,7 @@
 // playlist.cpp/bluetooth.cpp to compile and link unmodified. No real concurrency:
 // the "FreeRTOS" calls are no-ops (sim never starts the decoder task).
 #pragma once
+#define PROGMEM
 #include <cstdint>
 #include <cstdio>
 #include <cstdarg>
@@ -12,6 +13,7 @@
 #include <chrono>
 #include <thread>
 #include <algorithm>
+#include <cstdlib>
 
 class String {
 public:
@@ -21,12 +23,17 @@ public:
     String(int v) : s_(std::to_string(v)) {}
     String(unsigned int v) : s_(std::to_string(v)) {}
     String(long v) : s_(std::to_string(v)) {}
+    String(unsigned long v) : s_(std::to_string(v)) {}
 
     size_t length() const { return s_.size(); }
     const char *c_str() const { return s_.c_str(); }
     bool endsWith(const char *suf) const {
         size_t n = strlen(suf);
         return s_.size() >= n && s_.compare(s_.size() - n, n, suf) == 0;
+    }
+    bool startsWith(const char *pre) const {
+        size_t n = strlen(pre);
+        return s_.size() >= n && s_.compare(0, n, pre) == 0;
     }
     int lastIndexOf(char c) const {
         auto p = s_.rfind(c);
@@ -87,6 +94,11 @@ struct SerialClass {
     }
 };
 inline SerialClass Serial;
+
+struct ESPClass {
+    void restart() { std::exit(0); }  // sim has no real reboot; ending the process is the closest analog
+};
+inline ESPClass ESP;
 
 inline unsigned long millis() {
     using namespace std::chrono;

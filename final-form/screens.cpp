@@ -17,6 +17,8 @@
 #include "playlist.h"
 #include "audio_decoder.h"
 #include "nav.h"
+#include "bt_receiver.h"
+#include "wifi_transfer.h"
 
 extern Adafruit_ILI9341 tft;
 
@@ -53,52 +55,26 @@ void drawCoverArt(int x, int y, int w, int h) {
     maskCoverCorners(x, y, w, h, 12);
 }
 
+// Smartwatch-style icon grid: 6 circular buttons (2x3), icon only, no labels
+// and no "now playing" panel (track info lives in the Player screen instead).
 void drawMainMenu() {
     tft.fillScreen(COLOR_BG);
-    drawHeader("STREAM 32 PLAYER", false);
-    const char *menuLabelsNew[] = {"PLAYER", "TRACKS", "LIKES", "SETTINGS"};
-    for (int i = 0; i < 4; i++) {
-        int col = i % 2;
-        int row = i / 2;
-        int x = col == 0 ? MENU_BTN_X_LEFT : MENU_BTN_X_RIGHT;
-        int y = MENU_BTN_Y[row];
-
-        tft.fillRoundRect(x, y, MENU_BTN_W, MENU_BTN_H, 10, COLOR_PANEL);
-        tft.drawRoundRect(x, y, MENU_BTN_W, MENU_BTN_H, 10, COLOR_PANEL_BORDER);
-        uint16_t iconColor = COLOR_ACCENT;
-        if (i == 0) drawPlayIcon(x + MENU_BTN_W / 2, y + 25, 22, iconColor);
-        else if (i == 1) {
-            int cx = x + MENU_BTN_W / 2, cy = y + 25;
-            for (int r = -1; r <= 1; r++) {
-                tft.drawFastHLine(cx - 2, cy + r * 7, 15, iconColor);
-                tft.fillCircle(cx - 10, cy + r * 7, 2, iconColor);
-            }
-        } else if (i == 2) {
-            drawHeartIcon(x + MENU_BTN_W / 2, y + 25, 11, iconColor);
-        } else {
-            int cx = x + MENU_BTN_W / 2, cy = y + 25;
-            tft.drawCircle(cx, cy, 4, iconColor);
-            for (int tick = 0; tick < 8; tick++) {
-                float angle = tick * 0.7854f;
-                tft.drawLine(cx + (int)(8 * cos(angle)), cy + (int)(8 * sin(angle)),
-                             cx + (int)(11 * cos(angle)), cy + (int)(11 * sin(angle)), iconColor);
-            }
+    drawHeader("STREAM 32", false);
+    for (int i = 0; i < 6; i++) {
+        int cx = MENU_CELL_CX[i % 3];
+        int cy = MENU_CELL_CY[i / 3];
+        tft.fillCircle(cx, cy, MENU_CELL_R, COLOR_PANEL);
+        tft.drawCircle(cx, cy, MENU_CELL_R, COLOR_PANEL_BORDER);
+        switch (i) {
+            case 0: drawPlayIcon(cx, cy, 18, COLOR_ACCENT); break;
+            case 1: drawLibraryIcon(cx, cy, 14, COLOR_ACCENT); break;
+            case 2: drawPlaylistIcon(cx, cy, 14, COLOR_ACCENT); break;
+            case 3: drawHeartIcon(cx, cy, 15, COLOR_ACCENT); break;
+            case 4: drawGearIcon(cx, cy, 14, COLOR_ACCENT); break;
+            case 5: drawSwapIcon(cx, cy, 14, COLOR_ACCENT); break;
         }
-        tft.setTextColor(COLOR_TEXT_PRIMARY);
-        gfxDrawString(tft, menuLabelsNew[i], x + MENU_BTN_W / 2, y + 51, 1, GFX_MC);
-        if (focusIndex == i) drawFocusRing(x, y, MENU_BTN_W, MENU_BTN_H);
+        if (focusIndex == i) drawFocusRingCircle(cx, cy, MENU_CELL_R + 2);
     }
-    tft.fillRoundRect(10, 208, SCREEN_W - 20, 62, 10, COLOR_PANEL);
-    tft.drawRoundRect(10, 208, SCREEN_W - 20, 62, 10, COLOR_PANEL_BORDER);
-    tft.setTextColor(COLOR_TEXT_SECONDARY);
-    gfxDrawString(tft, "NOW PLAYING", 20, 216, 1, GFX_TL);
-    String homeTrack = total_tracks > 0 ? trackDisplayName(playlist[current_track_index]) : "No tracks on SD";
-    homeTrack = truncateToWidth(tft, homeTrack, 175, 2);
-    tft.setTextColor(COLOR_TEXT_PRIMARY);
-    gfxDrawString(tft, homeTrack, 20, 234, fontToSize(2), GFX_TL);
-    tft.setTextColor(COLOR_TEXT_SECONDARY);
-    gfxDrawString(tft, is_playing ? "Playing" : "Paused", 20, 252, fontToSize(2), GFX_TL);
-    drawBottomNavigation(0);
 }
 
 void drawSettingsScreen() {
@@ -106,29 +82,27 @@ void drawSettingsScreen() {
     drawHeader("SETTINGS");
     const char *labels[] = {"Bluetooth", "Screen", "Playback", "Theme", "Information", "Reset settings"};
     for (uint8_t i = 0; i < 6; i++) {
-        int y = 48 + i * 34;
-        tft.fillRoundRect(10, y, SCREEN_W - 20, 28, 8, COLOR_PANEL);
-        tft.drawRoundRect(10, y, SCREEN_W - 20, 28, 8, COLOR_PANEL_BORDER);
+        int y = 34 + i * 30;
+        tft.fillRoundRect(10, y, SCREEN_W - 20, 26, 8, COLOR_PANEL);
+        tft.drawRoundRect(10, y, SCREEN_W - 20, 26, 8, COLOR_PANEL_BORDER);
         tft.setTextColor(COLOR_TEXT_PRIMARY);
-        gfxDrawString(tft, labels[i], 20, y + 8, fontToSize(2), GFX_TL);
+        gfxDrawString(tft, labels[i], 20, y + 7, fontToSize(2), GFX_TL);
         tft.setTextColor(COLOR_TEXT_SECONDARY);
-        gfxDrawString(tft, ">", 218, y + 10, fontToSize(2), GFX_MC);
-        if (focusIndex == i) drawFocusRing(10, y, SCREEN_W - 20, 28);
+        gfxDrawString(tft, ">", SCREEN_W - 22, y + 9, fontToSize(2), GFX_MC);
+        if (focusIndex == i) drawFocusRing(10, y, SCREEN_W - 20, 26);
     }
-    drawBottomNavigation(4);
 }
 
 void drawPlaybackSettingsScreen() {
     tft.fillScreen(COLOR_BG);
     drawHeader("PLAYBACK");
-    tft.fillRoundRect(10, 55, SCREEN_W - 20, 38, 8, COLOR_PANEL);
-    tft.drawRoundRect(10, 55, SCREEN_W - 20, 38, 8, COLOR_PANEL_BORDER);
+    tft.fillRoundRect(10, 40, SCREEN_W - 20, 34, 8, COLOR_PANEL);
+    tft.drawRoundRect(10, 40, SCREEN_W - 20, 34, 8, COLOR_PANEL_BORDER);
     tft.setTextColor(COLOR_TEXT_PRIMARY);
-    gfxDrawString(tft, "Auto-play on connect", 20, 67, fontToSize(2), GFX_TL);
+    gfxDrawString(tft, "Auto-play on connect", 20, 51, fontToSize(2), GFX_TL);
     tft.setTextColor(autoPlayEnabled ? COLOR_ACCENT : COLOR_TEXT_SECONDARY);
-    gfxDrawString(tft, autoPlayEnabled ? "ON" : "OFF", 205, 75, fontToSize(2), GFX_MC);
-    if (focusIndex == 0) drawFocusRing(10, 55, SCREEN_W - 20, 38);
-    drawBottomNavigation(4);
+    gfxDrawString(tft, autoPlayEnabled ? "ON" : "OFF", SCREEN_W - 35, 58, fontToSize(2), GFX_MC);
+    if (focusIndex == 0) drawFocusRing(10, 40, SCREEN_W - 20, 34);
 }
 
 // Brightness row dropped: backlight is hard-wired to 3V3, no PWM GPIO free (pins.h).
@@ -138,22 +112,21 @@ void drawScreenSettingsScreen() {
     tft.fillScreen(COLOR_BG);
     drawHeader("SCREEN");
     tft.setTextColor(COLOR_TEXT_PRIMARY);
-    gfxDrawString(tft, "Screen timeout", 18, 60, fontToSize(2), GFX_TL);
+    gfxDrawString(tft, "Screen timeout", 18, 40, fontToSize(2), GFX_TL);
     const char *timeoutLabel = screenTimeoutMinutes == 0 ? "OFF" : (screenTimeoutMinutes == 1 ? "1 min" : (screenTimeoutMinutes == 5 ? "5 min" : "10 min"));
     tft.setTextColor(COLOR_ACCENT);
-    gfxDrawString(tft, timeoutLabel, 220, 60, fontToSize(2), GFX_TR);
+    gfxDrawString(tft, timeoutLabel, SCREEN_W - 18, 40, fontToSize(2), GFX_TR);
     const char *options[] = {"1 min", "5 min", "10 min", "OFF"};
     const uint8_t values[] = {1, 5, 10, 0};
     for (uint8_t i = 0; i < 4; i++) {
-        int x = 12 + i * 57;
+        int x = 12 + i * 76;
         bool selected = screenTimeoutMinutes == values[i];
-        tft.fillRoundRect(x, 95, 51, 30, 7, selected ? COLOR_ACCENT_DIM : COLOR_PANEL);
-        tft.drawRoundRect(x, 95, 51, 30, 7, selected ? COLOR_ACCENT : COLOR_PANEL_BORDER);
+        tft.fillRoundRect(x, 78, 70, 32, 7, selected ? COLOR_ACCENT_DIM : COLOR_PANEL);
+        tft.drawRoundRect(x, 78, 70, 32, 7, selected ? COLOR_ACCENT : COLOR_PANEL_BORDER);
         tft.setTextColor(COLOR_TEXT_PRIMARY);
-        gfxDrawString(tft, options[i], x + 25, 103, 1, GFX_MC);
-        if (focusIndex == i) drawFocusRing(x, 95, 51, 30);
+        gfxDrawString(tft, options[i], x + 35, 87, 1, GFX_MC);
+        if (focusIndex == i) drawFocusRing(x, 78, 70, 32);
     }
-    drawBottomNavigation(4);
 }
 
 void drawThemeSettingsScreen() {
@@ -161,15 +134,14 @@ void drawThemeSettingsScreen() {
     drawHeader("THEME");
     const char *names[] = {"Classic Green", "Blue", "Purple", "Amber", "Rose"};
     for (uint8_t i = 0; i < 5; i++) {
-        int y = 48 + i * 44;
+        int y = 36 + i * 34;
         bool selected = themeIndex == i;
-        tft.fillRoundRect(18, y, SCREEN_W - 36, 36, 9, selected ? COLOR_ACCENT_DIM : COLOR_PANEL);
-        tft.drawRoundRect(18, y, SCREEN_W - 36, 36, 9, selected ? COLOR_ACCENT : COLOR_PANEL_BORDER);
+        tft.fillRoundRect(18, y, SCREEN_W - 36, 30, 9, selected ? COLOR_ACCENT_DIM : COLOR_PANEL);
+        tft.drawRoundRect(18, y, SCREEN_W - 36, 30, 9, selected ? COLOR_ACCENT : COLOR_PANEL_BORDER);
         tft.setTextColor(COLOR_TEXT_PRIMARY);
-        gfxDrawString(tft, names[i], SCREEN_W / 2, y + 10, fontToSize(2), GFX_MC);
-        if (focusIndex == i) drawFocusRing(18, y, SCREEN_W - 36, 36);
+        gfxDrawString(tft, names[i], SCREEN_W / 2, y + 7, fontToSize(2), GFX_MC);
+        if (focusIndex == i) drawFocusRing(18, y, SCREEN_W - 36, 30);
     }
-    drawBottomNavigation(4);
 }
 
 // Original said "TAP / TO WAKE" (touch-only hardware). Touch is optional here, so
@@ -194,7 +166,6 @@ void drawInfoScreen() {
     gfxDrawString(tft, "Developed with love", SCREEN_W / 2, 165, fontToSize(2), GFX_MC);
     tft.setTextColor(COLOR_HEART_ACTIVE);
     gfxDrawString(tft, "by Stream32 Team", SCREEN_W / 2, 190, fontToSize(2), GFX_MC);
-    drawBottomNavigation(4);
 }
 
 void drawResetConfirmScreen() {
@@ -214,7 +185,6 @@ void drawResetConfirmScreen() {
     tft.drawRoundRect(126, 178, 96, 34, 9, COLOR_ACCENT);
     gfxDrawString(tft, "RESET", 174, 187, fontToSize(2), GFX_MC);
     if (focusIndex == 1) drawFocusRing(126, 178, 96, 34);
-    drawBottomNavigation(4);
 }
 
 void drawPlayerScreen() {
@@ -247,13 +217,13 @@ void drawPlayerScreen() {
     tft.fillRoundRect(PL_PROGRESS_X, PL_PROGRESS_Y, PL_PROGRESS_W, PL_PROGRESS_H, PL_PROGRESS_H / 2, COLOR_TRACK_BG);
     updateProgressBar(true);
 
-    tft.fillRoundRect(PL_PREV_X, PL_BTN_Y, PL_PREV_W, PL_BTN_H, 10, COLOR_PANEL);
-    tft.drawRoundRect(PL_PREV_X, PL_BTN_Y, PL_PREV_W, PL_BTN_H, 10, COLOR_PANEL_BORDER);
-    drawPrevIcon(PL_PREV_X + PL_PREV_W / 2, PL_BTN_Y + PL_BTN_H / 2, 16, COLOR_TEXT_PRIMARY);
+    tft.fillCircle(PL_PREV_CX, PL_BTN_CY, PL_BTN_R, COLOR_PANEL);
+    tft.drawCircle(PL_PREV_CX, PL_BTN_CY, PL_BTN_R, COLOR_PANEL_BORDER);
+    drawPrevIcon(PL_PREV_CX, PL_BTN_CY, 11, COLOR_TEXT_PRIMARY);
 
-    tft.fillRoundRect(PL_NEXT_X, PL_BTN_Y, PL_NEXT_W, PL_BTN_H, 10, COLOR_PANEL);
-    tft.drawRoundRect(PL_NEXT_X, PL_BTN_Y, PL_NEXT_W, PL_BTN_H, 10, COLOR_PANEL_BORDER);
-    drawNextIcon(PL_NEXT_X + PL_NEXT_W / 2, PL_BTN_Y + PL_BTN_H / 2, 16, COLOR_TEXT_PRIMARY);
+    tft.fillCircle(PL_NEXT_CX, PL_BTN_CY, PL_BTN_R, COLOR_PANEL);
+    tft.drawCircle(PL_NEXT_CX, PL_BTN_CY, PL_BTN_R, COLOR_PANEL_BORDER);
+    drawNextIcon(PL_NEXT_CX, PL_BTN_CY, 11, COLOR_TEXT_PRIMARY);
 
     updatePlayPauseButton();
 
@@ -267,7 +237,6 @@ void drawPlayerScreen() {
     gfxDrawString(tft, "+", PL_VOLUP_X + PL_VOLUP_W / 2, PL_VOL_Y + PL_VOL_H / 2 - 7, fontToSize(4), GFX_MC);
 
     updateVolumeUI();
-    drawBottomNavigation(0);
 }
 
 void updateLikeButton() {
@@ -279,12 +248,12 @@ void updateLikeButton() {
 
 void updatePlayPauseButton() {
     if (currentState != STATE_PLAYER) return;
-    tft.fillRoundRect(PL_PLAY_X, PL_BTN_Y, PL_PLAY_W, PL_BTN_H, 10, is_playing ? COLOR_ACCENT_DIM : COLOR_ACCENT);
-    tft.drawRoundRect(PL_PLAY_X, PL_BTN_Y, PL_PLAY_W, PL_BTN_H, 10, COLOR_PANEL_BORDER);
+    tft.fillCircle(PL_PLAY_CX, PL_BTN_CY, PL_BTN_R, is_playing ? COLOR_ACCENT_DIM : COLOR_ACCENT);
+    tft.drawCircle(PL_PLAY_CX, PL_BTN_CY, PL_BTN_R, COLOR_PANEL_BORDER);
     if (is_playing) {
-        drawPauseIcon(PL_PLAY_X + PL_PLAY_W / 2, PL_BTN_Y + PL_BTN_H / 2, 16, COLOR_BG);
+        drawPauseIcon(PL_PLAY_CX, PL_BTN_CY, 11, COLOR_BG);
     } else {
-        drawPlayIcon(PL_PLAY_X + PL_PLAY_W / 2, PL_BTN_Y + PL_BTN_H / 2, 16, COLOR_BG);
+        drawPlayIcon(PL_PLAY_CX, PL_BTN_CY, 11, COLOR_BG);
     }
 }
 
@@ -362,58 +331,194 @@ void drawTrackListScreen(bool onlyLikes) {
         gfxDrawString(tft, onlyLikes ? "No liked tracks" : "No MP3 files", SCREEN_W / 2, 140, fontToSize(2), GFX_MC);
     }
 
-    tft.fillRoundRect(20, 230, 50, 30, 6, COLOR_PANEL);
-    tft.drawRoundRect(20, 230, 50, 30, 6, COLOR_PANEL_BORDER);
-    drawPrevIcon(45, 245, 14, COLOR_TEXT_SECONDARY);
+    tft.fillRoundRect(20, 204, 50, 28, 6, COLOR_PANEL);
+    tft.drawRoundRect(20, 204, 50, 28, 6, COLOR_PANEL_BORDER);
+    drawPrevIcon(45, 218, 12, COLOR_TEXT_SECONDARY);
 
     tft.setTextColor(COLOR_TEXT_SECONDARY);
-    gfxDrawString(tft, String(page + 1) + "/" + String(maxPages), 120, 245, fontToSize(2), GFX_MC);
+    gfxDrawString(tft, String(page + 1) + "/" + String(maxPages), SCREEN_W / 2, 218, fontToSize(2), GFX_MC);
 
-    tft.fillRoundRect(170, 230, 50, 30, 6, COLOR_PANEL);
-    tft.drawRoundRect(170, 230, 50, 30, 6, COLOR_PANEL_BORDER);
-    drawNextIcon(195, 245, 14, COLOR_TEXT_SECONDARY);
-    drawBottomNavigation(onlyLikes ? 2 : 1);
+    tft.fillRoundRect(SCREEN_W - 70, 204, 50, 28, 6, COLOR_PANEL);
+    tft.drawRoundRect(SCREEN_W - 70, 204, 50, 28, 6, COLOR_PANEL_BORDER);
+    drawNextIcon(SCREEN_W - 45, 218, 12, COLOR_TEXT_SECONDARY);
 }
 
 void drawBTManagerScreen() {
     tft.fillScreen(COLOR_BG);
     drawHeader("BLUETOOTH");
-    tft.drawCircle(120, 92, 43, COLOR_PANEL_BORDER);
-    tft.drawCircle(120, 92, 37, COLOR_ACCENT_DIM);
-    drawBluetoothLogo(120, 92, 42, bt_connected ? COLOR_BT_CONNECTED : COLOR_BT_DISCONNECTED);
+    tft.drawCircle(SCREEN_W / 2, 82, 38, COLOR_PANEL_BORDER);
+    tft.drawCircle(SCREEN_W / 2, 82, 32, COLOR_ACCENT_DIM);
+    drawBluetoothLogo(SCREEN_W / 2, 82, 37, bt_connected ? COLOR_BT_CONNECTED : COLOR_BT_DISCONNECTED);
     tft.setTextColor(COLOR_TEXT_PRIMARY);
-    gfxDrawString(tft, bt_connected ? "Connected" : (bt_connecting ? "Connecting..." : "Disconnected"), SCREEN_W / 2, 145, fontToSize(2), GFX_MC);
+    gfxDrawString(tft, bt_connected ? "Connected" : (bt_connecting ? "Connecting..." : "Disconnected"), SCREEN_W / 2, 132, fontToSize(2), GFX_MC);
     tft.setTextColor(COLOR_TEXT_SECONDARY);
-    gfxDrawString(tft, savedBTDevice, SCREEN_W / 2, 164, fontToSize(2), GFX_MC);
+    gfxDrawString(tft, savedBTDevice, SCREEN_W / 2, 150, fontToSize(2), GFX_MC);
 
-    tft.fillRoundRect(20, 182, SCREEN_W - 40, 34, 9, COLOR_PANEL);
-    tft.drawRoundRect(20, 182, SCREEN_W - 40, 34, 9, COLOR_ACCENT_DIM);
+    tft.fillRoundRect(20, 166, SCREEN_W - 40, 30, 9, COLOR_PANEL);
+    tft.drawRoundRect(20, 166, SCREEN_W - 40, 30, 9, COLOR_ACCENT_DIM);
     tft.setTextColor(COLOR_TEXT_PRIMARY);
-    gfxDrawString(tft, bt_connected ? "DISCONNECT" : "CONNECT", SCREEN_W / 2, 191, fontToSize(2), GFX_MC);
-    if (focusIndex == 0) drawFocusRing(20, 182, SCREEN_W - 40, 34);
+    gfxDrawString(tft, bt_connected ? "DISCONNECT" : "CONNECT", SCREEN_W / 2, 174, fontToSize(2), GFX_MC);
+    if (focusIndex == 0) drawFocusRing(20, 166, SCREEN_W - 40, 30);
 
-    tft.fillRoundRect(20, 224, SCREEN_W - 40, 34, 9, COLOR_PANEL);
-    tft.drawRoundRect(20, 224, SCREEN_W - 40, 34, 9, COLOR_PANEL_BORDER);
-    gfxDrawString(tft, "SCAN DEVICES", SCREEN_W / 2, 233, fontToSize(2), GFX_MC);
-    if (focusIndex == 1) drawFocusRing(20, 224, SCREEN_W - 40, 34);
-
-    drawBottomNavigation(4);
+    tft.fillRoundRect(20, 202, SCREEN_W - 40, 30, 9, COLOR_PANEL);
+    tft.drawRoundRect(20, 202, SCREEN_W - 40, 30, 9, COLOR_PANEL_BORDER);
+    gfxDrawString(tft, "SCAN DEVICES", SCREEN_W / 2, 210, fontToSize(2), GFX_MC);
+    if (focusIndex == 1) drawFocusRing(20, 202, SCREEN_W - 40, 30);
 }
 
 void drawBluetoothScanScreen() {
     tft.fillScreen(COLOR_BG);
     drawHeader("BLUETOOTH");
     tft.setTextColor(COLOR_TEXT_SECONDARY);
-    gfxDrawString(tft, btScanActive ? "Scanning..." : "Select device", SCREEN_W / 2, 48, fontToSize(2), GFX_MC);
+    gfxDrawString(tft, btScanActive ? "Scanning..." : "Select device", SCREEN_W / 2, 36, fontToSize(2), GFX_MC);
     for (uint8_t i = 0; i < btScanCount; i++) {
-        int y = 68 + i * 31;
-        tft.fillRoundRect(10, y, SCREEN_W - 20, 26, 6, COLOR_PANEL);
-        tft.drawRoundRect(10, y, SCREEN_W - 20, 26, 6, COLOR_PANEL_BORDER);
+        int y = 52 + i * 27;
+        tft.fillRoundRect(10, y, SCREEN_W - 20, 24, 6, COLOR_PANEL);
+        tft.drawRoundRect(10, y, SCREEN_W - 20, 24, 6, COLOR_PANEL_BORDER);
         tft.setTextColor(COLOR_TEXT_PRIMARY);
-        gfxDrawString(tft, btScanNames[i], 20, y + 7, fontToSize(2), GFX_TL);
-        if (focusIndex == i) drawFocusRing(10, y, SCREEN_W - 20, 26);
+        gfxDrawString(tft, btScanNames[i], 20, y + 6, fontToSize(2), GFX_TL);
+        if (focusIndex == i) drawFocusRing(10, y, SCREEN_W - 20, 24);
     }
-    drawBottomNavigation(4);
+}
+
+// Generic rounded-rect row list, shared by drawPlaylistsScreen/drawPlaylistDetailScreen
+// (same visual pattern as drawTrackListScreen, minus paging -- lists are assumed
+// to fit one screen per the redesign spec).
+static void drawSimpleRowList(const String &name, int row) {
+    int listY = LIST_ITEM_Y_START + row * (LIST_ITEM_H + LIST_ITEM_GAP);
+    tft.fillRoundRect(10, listY, SCREEN_W - 20, LIST_ITEM_H, 8, COLOR_PANEL);
+    tft.drawRoundRect(10, listY, SCREEN_W - 20, LIST_ITEM_H, 8, COLOR_PANEL_BORDER);
+    tft.setTextColor(COLOR_TEXT_PRIMARY);
+    gfxDrawString(tft, truncateToWidth(tft, name, SCREEN_W - 40, 2), 20, listY + 10, fontToSize(2), GFX_TL);
+    if (focusIndex == row) drawFocusRing(10, listY, SCREEN_W - 20, LIST_ITEM_H);
+}
+
+void drawPlaylistsScreen() {
+    tft.fillScreen(COLOR_BG);
+    drawHeader("PLAYLISTS");
+    for (int i = 0; i < totalPlaylists; i++) drawSimpleRowList(playlistNames[i], i);
+    if (totalPlaylists == 0) {
+        tft.setTextColor(COLOR_TEXT_SECONDARY);
+        gfxDrawString(tft, "No playlists", SCREEN_W / 2, 140, fontToSize(2), GFX_MC);
+    }
+}
+
+void drawPlaylistDetailScreen() {
+    tft.fillScreen(COLOR_BG);
+    drawHeader("PLAYLIST");
+    int count = playlistTrackCount(playlist_selectedIndex);
+    for (int i = 0; i < count; i++) drawSimpleRowList(playlistTrackDisplayName(playlist_selectedIndex, i), i);
+    if (count == 0) {
+        tft.setTextColor(COLOR_TEXT_SECONDARY);
+        gfxDrawString(tft, "No tracks", SCREEN_W / 2, 140, fontToSize(2), GFX_MC);
+    }
+}
+
+void drawModeSelectScreen() {
+    tft.fillScreen(COLOR_BG);
+    drawHeader("MODE");
+    const char *labels[] = {"Local Player", "BT Receiver", "BT Transmitter", "Transfer File", "Kembali"};
+    for (uint8_t i = 0; i < 5; i++) {
+        int y = MODE_LIST_Y_START + i * (MODE_LIST_ITEM_H + MODE_LIST_GAP);
+        tft.fillRoundRect(10, y, SCREEN_W - 20, MODE_LIST_ITEM_H, 8, COLOR_PANEL);
+        tft.drawRoundRect(10, y, SCREEN_W - 20, MODE_LIST_ITEM_H, 8, COLOR_PANEL_BORDER);
+        tft.setTextColor(COLOR_TEXT_PRIMARY);
+        gfxDrawString(tft, labels[i], 20, y + MODE_LIST_ITEM_H / 2 - 7, fontToSize(2), GFX_TL);
+        if (i < 4 && (OperatingMode)i == operatingMode) {
+            int chipW = 50, chipH = 18;
+            int chipX = SCREEN_W - 20 - chipW - 6, chipY = y + (MODE_LIST_ITEM_H - chipH) / 2;
+            tft.fillRoundRect(chipX, chipY, chipW, chipH, 6, COLOR_CHIP_BG);
+            tft.setTextColor(COLOR_CHIP_TEXT);
+            gfxDrawString(tft, "AKTIF", chipX + chipW / 2, chipY + chipH / 2 - 6, 1, GFX_MC);
+        }
+        if (focusIndex == i) drawFocusRing(10, y, SCREEN_W - 20, MODE_LIST_ITEM_H);
+    }
+}
+
+// Full-screen transition message, mirroring drawScreenLocked()'s simple
+// centered-text style. No header: the device restarts ~600ms after this draws
+// (see nav.cpp's selectOperatingMode), so there's nothing to navigate back to.
+void drawModeSwitchingScreen() {
+    tft.fillScreen(COLOR_BG);
+    tft.setTextColor(COLOR_TEXT_PRIMARY);
+    gfxDrawString(tft, "Beralih mode...", SCREEN_W / 2, SCREEN_H / 2 - 10, fontToSize(4), GFX_MC);
+    tft.setTextColor(COLOR_TEXT_SECONDARY);
+    gfxDrawString(tft, "Restarting...", SCREEN_W / 2, SCREEN_H / 2 + 20, fontToSize(2), GFX_MC);
+}
+
+// "Home" screen for MODE_BT_RECEIVER (no STATE_MENU grid in this mode, so the
+// mode-switch hint doubles as the only way back to Settings/mode-select).
+void drawBTReceiverScreen() {
+    tft.fillScreen(COLOR_BG);
+    drawHeader("BT RECEIVER");
+    int cx = SCREEN_W / 2, cy = 78;
+    uint16_t btColor = btrx_connected ? COLOR_BT_CONNECTED : COLOR_BT_DISCONNECTED;
+    tft.drawCircle(cx, cy, 38, COLOR_PANEL_BORDER);
+    tft.drawCircle(cx, cy, 32, COLOR_ACCENT_DIM);
+    drawBluetoothLogo(cx, cy, 24, btColor);
+
+    tft.setTextColor(COLOR_TEXT_PRIMARY);
+    gfxDrawString(tft, btrx_connected ? "Connected" : "Waiting for phone...", cx, 130, fontToSize(2), GFX_MC);
+    tft.setTextColor(COLOR_TEXT_SECONDARY);
+    gfxDrawString(tft, btrx_deviceName, cx, 148, fontToSize(2), GFX_MC);
+    tft.setTextColor(btrx_playing ? COLOR_SUCCESS : COLOR_TEXT_SECONDARY);
+    gfxDrawString(tft, btrx_playing ? "Playing" : "Idle", cx, 168, fontToSize(2), GFX_MC);
+    tft.setTextColor(COLOR_TEXT_SECONDARY);
+    gfxDrawString(tft, String("Volume ") + String((bt_volume * 100) / 127) + "%", cx, 188, fontToSize(2), GFX_MC);
+
+    tft.setTextColor(COLOR_TEXT_SECONDARY);
+    gfxDrawString(tft, "Rotate encoder: volume", cx, 206, 1, GFX_MC);
+    gfxDrawString(tft, "Hold MENU: switch mode", cx, 220, 1, GFX_MC);
+}
+
+// "Home" screen for MODE_TRANSFER_FILE (same no-grid situation as BT Receiver).
+void drawTransferFileScreen() {
+    tft.fillScreen(COLOR_BG);
+    drawHeader("TRANSFER FILE");
+
+    tft.setTextColor(COLOR_TEXT_PRIMARY);
+    gfxDrawString(tft, String("WiFi AP: ") + wifiTransfer_ssid, SCREEN_W / 2, 42, fontToSize(2), GFX_MC);
+    tft.setTextColor(COLOR_TEXT_SECONDARY);
+    gfxDrawString(tft, wifiTransfer_ip, SCREEN_W / 2, 62, fontToSize(2), GFX_MC);
+
+    int barX = 30, barY = 92, barW = SCREEN_W - 60, barH = 14;
+    tft.fillRoundRect(barX, barY, barW, barH, barH / 2, COLOR_TRACK_BG);
+    int pct = wifiTransfer_lastUploadPct;
+    if (pct >= 0) {
+        int fillW = (barW * constrain(pct, 0, 100)) / 100;
+        if (fillW > 0) tft.fillRoundRect(barX, barY, fillW, barH, barH / 2, COLOR_ACCENT);
+        tft.setTextColor(COLOR_TEXT_PRIMARY);
+        gfxDrawString(tft, String(pct) + "%", SCREEN_W / 2, barY + barH + 8, fontToSize(2), GFX_MC);
+    } else {
+        tft.setTextColor(COLOR_TEXT_SECONDARY);
+        gfxDrawString(tft, "Waiting for upload...", SCREEN_W / 2, barY + barH + 8, fontToSize(2), GFX_MC);
+    }
+
+    tft.setTextColor(COLOR_TEXT_SECONDARY);
+    gfxDrawString(tft, String(wifiTransfer_filesReceived) + " files received", SCREEN_W / 2, 154, fontToSize(2), GFX_MC);
+
+    gfxDrawString(tft, "Hold MENU: switch mode", SCREEN_W / 2, SCREEN_H - 16, 1, GFX_MC);
+}
+
+// Floating auto-hiding volume pill, painted OVER whatever screen is current --
+// does not fillScreen/drawHeader, only nav.cpp's checkVolumeOverlayTimeout()
+// triggers the full redraw that erases it.
+void drawVolumeOverlay() {
+    tft.fillRoundRect(VOL_OVERLAY_X, VOL_OVERLAY_Y, VOL_OVERLAY_W, VOL_OVERLAY_H, 10, COLOR_PANEL);
+    tft.drawRoundRect(VOL_OVERLAY_X, VOL_OVERLAY_Y, VOL_OVERLAY_W, VOL_OVERLAY_H, 10, COLOR_PANEL_BORDER);
+
+    bool muted = (bt_volume == 0);
+    int iconCx = VOL_OVERLAY_X + 18, iconCy = VOL_OVERLAY_Y + VOL_OVERLAY_H / 2;
+    drawSpeakerIcon(iconCx, iconCy, 9, muted ? COLOR_WARNING : COLOR_TEXT_PRIMARY, muted);
+
+    int barX = VOL_OVERLAY_X + 36, barY = iconCy - 3, barW = 110, barH = 6;
+    tft.fillRoundRect(barX, barY, barW, barH, barH / 2, COLOR_TRACK_BG);
+    int fillW = (barW * bt_volume) / 127;
+    if (fillW > 0) tft.fillRoundRect(barX, barY, fillW, barH, barH / 2, muted ? COLOR_WARNING : COLOR_ACCENT);
+
+    int volPercent = (bt_volume * 100) / 127;
+    tft.setTextColor(COLOR_TEXT_PRIMARY);
+    gfxDrawString(tft, String(volPercent) + "%", VOL_OVERLAY_X + VOL_OVERLAY_W - 10, VOL_OVERLAY_Y + 12, fontToSize(2), GFX_TR);
 }
 
 void drawCurrentStateUI() {
@@ -431,5 +536,11 @@ void drawCurrentStateUI() {
         case STATE_INFO: drawInfoScreen(); break;
         case STATE_RESET_CONFIRM: drawResetConfirmScreen(); break;
         case STATE_THEME_SETTINGS: drawThemeSettingsScreen(); break;
+        case STATE_PLAYLISTS: drawPlaylistsScreen(); break;
+        case STATE_PLAYLIST_DETAIL: drawPlaylistDetailScreen(); break;
+        case STATE_MODE_SELECT: drawModeSelectScreen(); break;
+        case STATE_MODE_SWITCHING: drawModeSwitchingScreen(); break;
+        case STATE_BT_RECEIVER: drawBTReceiverScreen(); break;
+        case STATE_TRANSFER_FILE: drawTransferFileScreen(); break;
     }
 }

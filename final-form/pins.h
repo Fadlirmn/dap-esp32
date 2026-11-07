@@ -31,3 +31,9 @@
 #define PIN_BTN_MENU 39
 
 // Backlight is wired straight to 3V3 (no PWM pin available: GPIO32 is taken by PREV).
+
+// I2S DAC (Local Player wired IEM output). Proposed assignment -- none of
+// these clash with the pins above; correct here if your module differs.
+#define PIN_I2S_BCLK 25
+#define PIN_I2S_LRC  26
+#define PIN_I2S_DOUT 22

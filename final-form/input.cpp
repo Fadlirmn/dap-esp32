@@ -71,6 +71,30 @@ static void pollEncoderSwitch() {
     }
 }
 
+// ---- MENU: short press (back/menu) vs. long press (open mode switcher) ----
+static void pollMenuButton() {
+    static bool last = HIGH;
+    static unsigned long downAt = 0, lastEdgeAt = 0;
+    static bool longFired = false;
+    unsigned long now = millis();
+
+    bool b = digitalRead(PIN_BTN_MENU);
+    if (b != last && now - lastEdgeAt >= DEBOUNCE_MS) {
+        lastEdgeAt = now;
+        last = b;
+        if (b == LOW) {
+            downAt = now;
+            longFired = false;
+        } else if (!longFired) {
+            handleMenuButton();
+        }
+    }
+    if (b == LOW && !longFired && now - downAt >= LONG_PRESS_MS) {
+        handleMenuLongPress();
+        longFired = true;
+    }
+}
+
 // ---- PREV/NEXT/MENU: debounced press + hold-to-repeat (PREV/NEXT only) ----
 static void pollButton(uint8_t pin, void (*onFire)(), bool repeats) {
     struct State { bool last; unsigned long downAt, lastEdgeAt, lastRepeatAt; };
@@ -99,7 +123,7 @@ void inputPoll() {
     pollEncoderSwitch();
     pollButton(PIN_BTN_PREV, handlePrevButton, true);
     pollButton(PIN_BTN_NEXT, handleNextButton, true);
-    pollButton(PIN_BTN_MENU, handleMenuButton, false);
+    pollMenuButton();
 
     noInterrupts();
     int ticks = encoderTicks;

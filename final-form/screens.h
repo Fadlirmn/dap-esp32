@@ -17,6 +17,14 @@ void drawTrackListScreen(bool onlyLikes);
 void drawBTManagerScreen();
 void drawBluetoothScanScreen();
 
+// New per the dap-ui-design redesign (nav.h's new UIState values).
+void drawPlaylistsScreen();
+void drawPlaylistDetailScreen();
+void drawModeSelectScreen();
+void drawModeSwitchingScreen();
+void drawBTReceiverScreen();
+void drawTransferFileScreen();
+
 void drawCurrentStateUI();  // dispatches on nav.h's currentState
 
 // Partial Player-screen redraws (avoid a full repaint on every tick).
@@ -24,3 +32,7 @@ void updateLikeButton();
 void updatePlayPauseButton();
 void updateProgressBar(bool forceRedraw);
 void updateVolumeUI();
+
+// Floating auto-hiding volume overlay (nav.h's lastVolumeChangeAt/
+// checkVolumeOverlayTimeout): draw it over whatever screen is current.
+void drawVolumeOverlay();

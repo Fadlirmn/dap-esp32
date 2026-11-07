@@ -11,7 +11,11 @@
 #include "nav.h"
 #include "playlist.h"
 #include "bluetooth.h"
+#include "bt_receiver.h"
+#include "wifi_transfer.h"
+#include "i2s_output.h"
 #include "audio_decoder.h"
+#include "layout.h"
 
 Adafruit_ILI9341 tft(0, 0, 0);
 Preferences preferences;
@@ -22,7 +26,7 @@ int main() {
         return 1;
     }
     SDL_Window *win = SDL_CreateWindow("final-form sim", SDL_WINDOWPOS_CENTERED,
-                                        SDL_WINDOWPOS_CENTERED, 240, 320, 0);
+                                        SDL_WINDOWPOS_CENTERED, SCREEN_W, SCREEN_H, 0);
     SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
     SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
     Adafruit_GFX::renderer = ren;
@@ -33,13 +37,21 @@ int main() {
     initColorTheme();
     applyTheme(0);
 
+    loadOperatingMode();
     audioDecoderSetup();
     SD.begin(0);
     loadPlaylist();
+    loadPlaylistIndex();
     if (total_tracks > 0) openCurrentTrack();
-    btSetup();
 
-    currentState = STATE_MENU;
+    switch (operatingMode) {
+        case MODE_BT_TRANSMITTER: btSetup(); break;
+        case MODE_LOCAL_PLAYER: i2sOutputSetup(); break;
+        case MODE_BT_RECEIVER: i2sOutputSetup(); btReceiverSetup(); break;
+        case MODE_TRANSFER_FILE: wifiTransferSetup(); break;
+    }
+
+    currentState = homeStateForMode();
     drawCurrentStateUI();
     SDL_RenderPresent(ren);
 
@@ -61,6 +73,7 @@ int main() {
                     case SDLK_UP: handleEncoderRotate(1); redraw = true; break;
                     case SDLK_DOWN: handleEncoderRotate(-1); redraw = true; break;
                     case SDLK_m: handleMenuButton(); redraw = true; break;
+                    case SDLK_n: handleMenuLongPress(); redraw = true; break;  // open mode switcher (MENU long-press)
                     case SDLK_b:
                         bt_connected = !bt_connected;
                         bt_state_changed = true;
@@ -71,7 +84,9 @@ int main() {
         }
 
         checkScreenTimeout();
+        checkVolumeOverlayTimeout();
         checkBluetoothScanTimeout();
+        if (operatingMode == MODE_TRANSFER_FILE) wifiTransferPoll();
         if (bt_state_changed) {
             updatePlaybackFromBluetooth();
             redraw = true;

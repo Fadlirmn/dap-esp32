@@ -2,8 +2,12 @@
 // (old/files/test_input.ino + old/files/plan.md). setup()/loop() glue only -- see
 // pins.h for the wiring and nav.h for the control mapping.
 //
-// Rotation differs from test_input.ino on purpose: Stream32's layout (layout.h)
-// is portrait 240x320, so rotation is 0 here, not test_input.ino's 1.
+// layout.h is landscape 320x240 (not test_input.ino's portrait reading) --
+// rotation 1 is what puts this physical panel in that orientation.
+//
+// One OperatingMode (nav.h) runs per boot, chosen by selectOperatingMode()
+// and persisted in Preferences; switching modes is a full ESP.restart(), so
+// setup()/loop() only bring up the subsystems the active mode actually needs.
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
@@ -21,6 +25,9 @@
 #include "touch.h"
 #include "playlist.h"
 #include "bluetooth.h"
+#include "bt_receiver.h"
+#include "wifi_transfer.h"
+#include "i2s_output.h"
 #include "audio_decoder.h"
 
 Adafruit_ILI9341 tft(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
@@ -35,9 +42,10 @@ static void fatalError(const char *msg) {
 
 void setup() {
     Serial.begin(115200);
+    loadOperatingMode();  // before anything else: decides which subsystems below actually start
 
     tft.begin();
-    tft.setRotation(0);
+    tft.setRotation(1);
     initColorTheme();
 
     tft.fillScreen(COLOR_BG);
@@ -57,7 +65,14 @@ void setup() {
     if (!sdReady) fatalError("SD Error!");
 
     loadPlaylist();
-    if (total_tracks > 0) {
+    loadPlaylistIndex();
+
+    // Local Player / BT Transmitter both play from the SD library through the
+    // same STATE_MENU/STATE_PLAYER UI -- resume state, likes and the decoder
+    // task only matter for those two. BT Receiver plays whatever the phone
+    // streams; Transfer File plays nothing.
+    bool playsLocalLibrary = (operatingMode == MODE_LOCAL_PLAYER || operatingMode == MODE_BT_TRANSMITTER);
+    if (playsLocalLibrary && total_tracks > 0) {
         loadLikes();
         preferences.begin("resume_pref", true);
         String resumeTrack = preferences.getString("track", "");
@@ -85,14 +100,18 @@ void setup() {
     preferences.end();
     applyTheme(themeIndex);
 
-    btSetup();
-    startDecoderTask();
+    switch (operatingMode) {
+        case MODE_LOCAL_PLAYER: i2sOutputSetup(); startDecoderTask(); break;
+        case MODE_BT_RECEIVER: i2sOutputSetup(); btReceiverSetup(); break;
+        case MODE_BT_TRANSMITTER: btSetup(); startDecoderTask(); break;
+        case MODE_TRANSFER_FILE: wifiTransferSetup(); break;
+    }
 
 #if ENABLE_TOUCH
     touchSetup();
 #endif
 
-    currentState = STATE_MENU;
+    currentState = homeStateForMode();
     drawCurrentStateUI();
 }
 
@@ -108,41 +127,52 @@ void loop() {
     touchPoll();
 #endif
     checkScreenTimeout();
-    checkBluetoothScanTimeout();
+    checkVolumeOverlayTimeout();
 
-    if (need_next_track) {
-        need_next_track = false;
-        switchTrack(1);
-    }
+    if (operatingMode == MODE_TRANSFER_FILE) wifiTransferPoll();
 
-    if (currentState == STATE_BT_SCAN && btScanCount != lastScanCount) {
-        lastScanCount = btScanCount;
-        if (!screenLocked) drawCurrentStateUI();
-    }
+    // Everything below is BT Transmitter-specific (A2DP source polling/scan)
+    // or local-library playback (auto-advance/resume save) -- both only ever
+    // reachable in MODE_LOCAL_PLAYER/MODE_BT_TRANSMITTER, since no other mode
+    // can drive is_playing or STATE_BT_SCAN, but gate explicitly for clarity.
+    if (operatingMode == MODE_BT_TRANSMITTER) {
+        checkBluetoothScanTimeout();
 
-    if (is_playing && now - lastResumeSave > 5000) {
-        saveResumeState();
-        lastResumeSave = now;
-    }
-
-    if (now - lastBtStatusCheck > 250) {
-        bool currentStatus = a2dp_source.is_connected();
-        if (currentStatus != bt_connected) {
-            bt_connected = currentStatus;
-            if (!currentStatus) bt_audio_started = false;
-            bt_state_changed = true;
+        if (currentState == STATE_BT_SCAN && btScanCount != lastScanCount) {
+            lastScanCount = btScanCount;
+            if (!screenLocked) drawCurrentStateUI();
         }
-        lastBtStatusCheck = now;
+
+        if (now - lastBtStatusCheck > 250) {
+            bool currentStatus = a2dp_source.is_connected();
+            if (currentStatus != bt_connected) {
+                bt_connected = currentStatus;
+                if (!currentStatus) bt_audio_started = false;
+                bt_state_changed = true;
+            }
+            lastBtStatusCheck = now;
+        }
+        if (bt_state_changed) {
+            bt_state_changed = false;
+            updatePlaybackFromBluetooth();
+            if (!screenLocked) drawCurrentStateUI();
+        }
+        if (play_requested && !is_playing && bt_connected &&
+            now - play_request_started_at >= A2DP_PLAY_PRIME_DELAY_MS) {
+            updatePlaybackFromBluetooth();
+            updatePlayPauseButton();
+        }
     }
-    if (bt_state_changed) {
-        bt_state_changed = false;
-        updatePlaybackFromBluetooth();
-        if (!screenLocked) drawCurrentStateUI();
-    }
-    if (play_requested && !is_playing && bt_connected &&
-        now - play_request_started_at >= A2DP_PLAY_PRIME_DELAY_MS) {
-        updatePlaybackFromBluetooth();
-        updatePlayPauseButton();
+
+    if (operatingMode == MODE_LOCAL_PLAYER || operatingMode == MODE_BT_TRANSMITTER) {
+        if (need_next_track) {
+            need_next_track = false;
+            switchTrack(1);
+        }
+        if (is_playing && now - lastResumeSave > 5000) {
+            saveResumeState();
+            lastResumeSave = now;
+        }
     }
 
     if (!screenLocked && is_playing && currentState == STATE_PLAYER && now - lastProgressUpdate > 400) {

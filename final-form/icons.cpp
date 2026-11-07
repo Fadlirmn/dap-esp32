@@ -68,31 +68,75 @@ void drawBackIcon(int cx, int cy, uint16_t color) {
     tft.drawLine(cx - 4, cy, cx + 4, cy + 6, color);
 }
 
-void drawNavIcon(uint8_t index, int cx, int cy, uint16_t color) {
-    switch (index) {
-        case 0:  // Home
-            tft.drawLine(cx - 6, cy, cx, cy - 6, color);
-            tft.drawLine(cx, cy - 6, cx + 6, cy, color);
-            tft.drawRect(cx - 4, cy, 8, 6, color);
-            break;
-        case 1:  // Library
-            tft.fillRect(cx - 6, cy - 6, 3, 12, color);
-            tft.fillRect(cx - 1, cy - 6, 3, 12, color);
-            tft.fillRect(cx + 4, cy - 6, 3, 12, color);
-            break;
-        case 2:  // Likes
-            drawHeartIcon(cx, cy, 6, color);
-            break;
-        case 3:  // Bluetooth
-            drawBluetoothLogo(cx, cy, 6, color);
-            break;
-        case 4:  // Settings
-            for (int a = 0; a < 360; a += 45) {
-                float rad = a * M_PI / 180.0;
-                tft.drawLine(cx, cy, cx + cos(rad) * 8, cy + sin(rad) * 8, color);
-            }
-            tft.fillCircle(cx, cy, 3, color);
-            break;
+// "Tracks" glyph: 3 note-stems + dots, hoisted out of drawMainMenu's inline
+// code so the main-menu grid and any future screen can both use it.
+void drawLibraryIcon(int cx, int cy, int size, uint16_t color) {
+    for (int r = -1; r <= 1; r++) {
+        tft.drawFastHLine(cx - 2, cy + r * (size / 2), size + 3, color);
+        tft.fillCircle(cx - size, cy + r * (size / 2), 2, color);
+    }
+}
+
+// "Settings" glyph: gear (ring + 8 ticks), hoisted out of drawMainMenu's
+// inline code for the same reason as drawLibraryIcon above.
+void drawGearIcon(int cx, int cy, int size, uint16_t color) {
+    tft.drawCircle(cx, cy, size / 2, color);
+    for (int tick = 0; tick < 8; tick++) {
+        float angle = tick * 0.7854f;
+        tft.drawLine(cx + (int)(size * cos(angle)), cy + (int)(size * sin(angle)),
+                     cx + (int)((size + 3) * cos(angle)), cy + (int)((size + 3) * sin(angle)), color);
+    }
+}
+
+// "Playlists" glyph: stacked horizontal bars (a list of rows) with a small
+// play-triangle badge at bottom-right, distinguishing it from drawLibraryIcon's
+// note-stems-and-dots.
+void drawPlaylistIcon(int cx, int cy, int size, uint16_t color) {
+    int barLen = size * 2 - 4;
+    tft.drawFastHLine(cx - size, cy - size + 2, barLen, color);
+    tft.drawFastHLine(cx - size, cy - size / 4, barLen - 3, color);
+    tft.drawFastHLine(cx - size, cy + size / 2, barLen - 6, color);
+    tft.fillTriangle(cx + size / 2 - 2, cy + size - 6, cx + size / 2 - 2, cy + size + 2, cx + size + 2, cy + size - 2, color);
+}
+
+// "Mode-switch" glyph: two opposing arrows joined into a loop (the usual
+// curved-arrow swap icon, approximated with straight lines + triangle heads --
+// Adafruit_GFX has no arc/bezier primitive).
+void drawSwapIcon(int cx, int cy, int size, uint16_t color) {
+    int topY = cy - size / 2, botY = cy + size / 2;
+    int left = cx - size, right = cx + size;
+    tft.drawLine(left, topY, right - 4, topY, color);
+    tft.fillTriangle(right - 6, topY - 4, right - 6, topY + 4, right, topY, color);
+    tft.drawLine(right, botY, left + 4, botY, color);
+    tft.fillTriangle(left + 6, botY - 4, left + 6, botY + 4, left, botY, color);
+    tft.drawLine(left, topY, left, botY, color);
+    tft.drawLine(right, topY, right, botY, color);
+}
+
+// Header dummy-battery glyph: outline + tip, filled proportional to pct.
+// Decorative only -- no ADC pin wired, see layout.h's DUMMY_BATTERY_PCT.
+void drawBatteryIcon(int x, int y, int w, int h, uint8_t pct, uint16_t color) {
+    uint8_t p = pct > 100 ? 100 : pct;
+    tft.drawRoundRect(x, y, w, h, 2, color);
+    int tipH = h / 2;
+    tft.fillRect(x + w, y + (h - tipH) / 2, 2, tipH, color);
+    int innerW = w - 4;
+    int fillW = (innerW * p) / 100;
+    if (fillW > 0) tft.fillRect(x + 2, y + 2, fillW, h - 4, color);
+}
+
+// Volume-overlay speaker glyph: body + cone, sound-wave rings when unmuted,
+// a cross when `muted` (caller passes bt_volume==0, with a warning color).
+void drawSpeakerIcon(int cx, int cy, int size, uint16_t color, bool muted) {
+    int bodyW = size / 2;
+    tft.fillRect(cx - size, cy - bodyW / 2, bodyW, bodyW, color);
+    tft.fillTriangle(cx - size + bodyW, cy - size, cx - size + bodyW, cy + size, cx, cy, color);
+    if (muted) {
+        tft.drawLine(cx + 2, cy - size, cx + size, cy + size, color);
+        tft.drawLine(cx + 2, cy + size, cx + size, cy - size, color);
+    } else {
+        tft.drawCircle(cx + size / 2, cy, size / 2, color);
+        tft.drawCircle(cx + size, cy, size, color);
     }
 }
 
@@ -117,24 +161,20 @@ void drawHeader(const char *title, bool hasBackButton) {
         tft.fillCircle(20, HEADER_H / 2, 12, COLOR_TRACK_BG);
         drawBackIcon(20, HEADER_H / 2, COLOR_TEXT_PRIMARY);
     }
+    // Dummy battery glyph + %, past the back button (no ADC wired, see layout.h).
+    int battX = 40, battY = (HEADER_H - 10) / 2, battW = 18, battH = 10;
+    drawBatteryIcon(battX, battY, battW, battH, DUMMY_BATTERY_PCT, COLOR_TEXT_PRIMARY);
+    tft.setTextColor(COLOR_TEXT_SECONDARY, COLOR_PANEL);
+    gfxDrawString(tft, String(DUMMY_BATTERY_PCT) + "%", battX + battW + 6, battY - 1, 1, GFX_TL);
     drawBluetoothStatusIcon();
-}
-
-void drawBottomNavigation(uint8_t activeTab) {
-    static const char *labels[5] = {"Home", "Library", "Likes", "Bluetooth", "Settings"};
-    tft.fillRect(0, NAV_Y, SCREEN_W, NAV_H, COLOR_PANEL);
-    tft.drawFastHLine(0, NAV_Y, SCREEN_W, COLOR_PANEL_BORDER);
-    int centers[5];
-    for (int i = 0; i < 5; i++) centers[i] = (SCREEN_W / 5) * i + (SCREEN_W / 10);
-    for (int i = 0; i < 5; i++) {
-        uint16_t color = (i == activeTab) ? COLOR_ACCENT : COLOR_TEXT_SECONDARY;
-        drawNavIcon(i, centers[i], NAV_Y + 12, color);
-        tft.setTextColor(color, COLOR_PANEL);
-        gfxDrawString(tft, labels[i], centers[i], NAV_Y + 22, 1, GFX_MC);
-    }
 }
 
 void drawFocusRing(int x, int y, int w, int h) {
     tft.drawRoundRect(x, y, w, h, 4, COLOR_ACCENT);
     tft.drawRoundRect(x - 1, y - 1, w + 2, h + 2, 5, COLOR_ACCENT);
+}
+
+void drawFocusRingCircle(int cx, int cy, int r) {
+    tft.drawCircle(cx, cy, r, COLOR_ACCENT);
+    tft.drawCircle(cx, cy, r + 1, COLOR_ACCENT);
 }

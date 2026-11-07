@@ -12,6 +12,8 @@
 #include "bluetooth.h"
 #include "audio_decoder.h"
 #include "playlist.h"
+#include "bt_receiver.h"
+#include "i2s_output.h"
 
 extern Preferences preferences;
 
@@ -22,6 +24,46 @@ int likesList_currentPage = 0;
 uint8_t screenTimeoutMinutes = 0;
 bool screenLocked = false;
 static unsigned long lastActivityAt = 0;
+
+OperatingMode operatingMode = MODE_LOCAL_PLAYER;
+unsigned long lastVolumeChangeAt = 0;
+
+// Must run before audioDecoderSetup()/btSetup()/i2sOutputSetup()/etc. so
+// final-form.ino's setup() knows which subsystems to bring up.
+void loadOperatingMode() {
+    preferences.begin("mode_pref", true);
+    operatingMode = (OperatingMode)preferences.getUChar("mode", MODE_LOCAL_PLAYER);
+    preferences.end();
+    if (operatingMode > MODE_TRANSFER_FILE) operatingMode = MODE_LOCAL_PLAYER;
+}
+
+void enterModeSelect() {
+    currentState = STATE_MODE_SELECT;
+    focusIndex = (int)operatingMode;
+    drawCurrentStateUI();
+}
+
+// "Beralih mode" transition screen, then restart into the new mode. Only one
+// mode runs per boot (Local Player / BT Receiver / BT Transmitter / Transfer
+// File each own the radio/I2S/WiFi hardware exclusively), so switching is a
+// full restart rather than a live subsystem swap.
+void selectOperatingMode(OperatingMode m) {
+    if (m == operatingMode) { enterState(STATE_MENU); return; }
+    preferences.begin("mode_pref", false);
+    preferences.putUChar("mode", (uint8_t)m);
+    preferences.end();
+    currentState = STATE_MODE_SWITCHING;
+    drawCurrentStateUI();
+    delay(600);
+    ESP.restart();
+}
+
+void checkVolumeOverlayTimeout() {
+    if (lastVolumeChangeAt != 0 && millis() - lastVolumeChangeAt >= VOLUME_OVERLAY_MS) {
+        lastVolumeChangeAt = 0;
+        if (!screenLocked) drawCurrentStateUI();
+    }
+}
 
 // Any input handler starts with this: wakes a locked screen (consuming the
 // event as just a wake-up, same as the original's touch early-return) and
@@ -56,7 +98,25 @@ static int themeListCount() { return 5; }
 static int resetConfirmCount() { return 2; }
 static int btManagerCount() { return 2; }
 static int screenTimeoutCount() { return 4; }
-static int menuGridCount() { return 4; }
+static int menuGridCount() { return 6; }  // Player/Tracks/Playlists/Likes/Settings/Mode-switch
+static int modeSelectCount() { return 5; }  // Local Player/BT Receiver/BT Transmitter/Transfer File/Kembali
+static int playlistsCount() { return totalPlaylists; }
+
+// Which playlist STATE_PLAYLIST_DETAIL is showing. ponytail: no paging within
+// a playlist yet (focusIndex maps 1:1 to track index) -- add LIST_ITEMS_PER_PAGE
+// paging like the track list if playlists ever need to exceed one screen.
+int playlist_selectedIndex = 0;
+
+// STATE_MENU, STATE_BT_RECEIVER and STATE_TRANSFER_FILE are each only valid
+// for specific modes; "home" is whichever one boots for the active mode, and
+// is also where cancelling out of the mode-select screen lands.
+UIState homeStateForMode() {
+    switch (operatingMode) {
+        case MODE_BT_RECEIVER: return STATE_BT_RECEIVER;
+        case MODE_TRANSFER_FILE: return STATE_TRANSFER_FILE;
+        default: return STATE_MENU;  // MODE_LOCAL_PLAYER, MODE_BT_TRANSMITTER
+    }
+}
 
 static int trackListMatchCount(bool onlyLikes) {
     int n = 0;
@@ -103,12 +163,27 @@ static void handleSelect() {
             switch (focusIndex) {
                 case 0: enterState(STATE_PLAYER); break;
                 case 1: trackList_currentPage = 0; enterState(STATE_TRACK_LIST); break;
-                case 2: likesList_currentPage = 0; enterState(STATE_LIKES_LIST); break;
-                case 3: enterState(STATE_SETTINGS); break;
+                case 2: enterState(STATE_PLAYLISTS); break;
+                case 3: likesList_currentPage = 0; enterState(STATE_LIKES_LIST); break;
+                case 4: enterState(STATE_SETTINGS); break;
+                case 5: enterModeSelect(); break;
             }
             break;
         case STATE_TRACK_LIST: selectTrackListItem(false); break;
         case STATE_LIKES_LIST: selectTrackListItem(true); break;
+        case STATE_PLAYLISTS:
+            if (focusIndex < totalPlaylists) {
+                playlist_selectedIndex = focusIndex;
+                enterState(STATE_PLAYLIST_DETAIL);
+            }
+            break;
+        case STATE_PLAYLIST_DETAIL:
+            if (playPlaylistTrack(playlist_selectedIndex, focusIndex)) enterState(STATE_PLAYER);
+            break;
+        case STATE_MODE_SELECT:
+            if (focusIndex == 4) { enterState(homeStateForMode()); }  // Kembali
+            else selectOperatingMode((OperatingMode)focusIndex);
+            break;
         case STATE_SETTINGS:
             switch (focusIndex) {
                 case 0: enterState(STATE_BT_MANAGER); break;
@@ -198,11 +273,18 @@ void handleEncoderRotate(int delta) {
     constexpr int VOLUME_STEP = 4;
     int v = (int)bt_volume + delta * VOLUME_STEP;
     bt_volume = (uint8_t)constrain(v, 0, 127);
-    a2dp_source.set_volume(bt_volume);
+    switch (operatingMode) {
+        case MODE_BT_TRANSMITTER: a2dp_source.set_volume(bt_volume); break;
+        case MODE_LOCAL_PLAYER: i2sOutputSetVolume(bt_volume); break;
+        case MODE_BT_RECEIVER: btReceiverSetVolume(bt_volume); break;
+        case MODE_TRANSFER_FILE: break;  // no audio path in this mode
+    }
     preferences.begin("vol_pref", false);
     preferences.putUChar("volume", bt_volume);
     preferences.end();
+    lastVolumeChangeAt = millis();
     updateVolumeUI();
+    drawVolumeOverlay();
 }
 
 // ---- PREV/NEXT: track skip in Player, cursor move (with paging) elsewhere ----
@@ -245,6 +327,9 @@ void handlePrevButton() {
         case STATE_BT_MANAGER: moveFocus(-1, btManagerCount()); break;
         case STATE_SCREEN_SETTINGS: moveFocus(-1, screenTimeoutCount()); break;
         case STATE_BT_SCAN: moveFocus(-1, btScanCount); break;
+        case STATE_PLAYLISTS: moveFocus(-1, playlistsCount()); break;
+        case STATE_PLAYLIST_DETAIL: moveFocus(-1, playlistTrackCount(playlist_selectedIndex)); break;
+        case STATE_MODE_SELECT: moveFocus(-1, modeSelectCount()); break;
         default: break;
     }
 }
@@ -262,6 +347,9 @@ void handleNextButton() {
         case STATE_BT_MANAGER: moveFocus(1, btManagerCount()); break;
         case STATE_SCREEN_SETTINGS: moveFocus(1, screenTimeoutCount()); break;
         case STATE_BT_SCAN: moveFocus(1, btScanCount); break;
+        case STATE_PLAYLISTS: moveFocus(1, playlistsCount()); break;
+        case STATE_PLAYLIST_DETAIL: moveFocus(1, playlistTrackCount(playlist_selectedIndex)); break;
+        case STATE_MODE_SELECT: moveFocus(1, modeSelectCount()); break;
         default: break;
     }
 }
@@ -270,7 +358,7 @@ void handleNextButton() {
 // (ported from the pointInRect(x,y,8,5,55,24) branch of processGlobalTouch).
 void handleMenuButton() {
     if (consumeWakeOrNoteActivity()) return;
-    if (currentState == STATE_MENU) return;
+    if (currentState == homeStateForMode()) return;
     switch (currentState) {
         case STATE_SCREEN_SETTINGS:
         case STATE_PLAYBACK_SETTINGS:
@@ -282,10 +370,25 @@ void handleMenuButton() {
         case STATE_BT_SCAN:
             enterState(STATE_BT_MANAGER);
             break;
+        case STATE_PLAYLIST_DETAIL:
+            enterState(STATE_PLAYLISTS);
+            break;
+        case STATE_MODE_SELECT:
+        case STATE_MODE_SWITCHING:
+            enterState(homeStateForMode());
+            break;
         default:
-            enterState(STATE_MENU);
+            enterState(homeStateForMode());
             break;
     }
+}
+
+// Long press (wired in input.cpp): open the mode switcher from anywhere,
+// including the two dedicated-screen modes that have no STATE_MENU grid.
+void handleMenuLongPress() {
+    if (consumeWakeOrNoteActivity()) return;
+    if (currentState == STATE_MODE_SWITCHING) return;  // mid-restart, ignore
+    enterModeSelect();
 }
 
 #if ENABLE_TOUCH
@@ -295,6 +398,11 @@ static bool pointInRect(int x, int y, int rx, int ry, int rw, int rh) {
     return (x >= rx && x <= rx + rw && y >= ry && y <= ry + rh);
 }
 
+static bool pointInCircle(int x, int y, int cx, int cy, int r) {
+    int dx = x - cx, dy = y - cy;
+    return dx * dx + dy * dy <= r * r;
+}
+
 void processGlobalTouch(int x, int y) {
     if (consumeWakeOrNoteActivity()) return;
     if (y < HEADER_H && x >= SCREEN_W - 42) {
@@ -302,48 +410,31 @@ void processGlobalTouch(int x, int y) {
         drawCurrentStateUI();
         return;
     }
-    if (currentState != STATE_MENU) {
+    if (currentState != homeStateForMode()) {
         if (pointInRect(x, y, 8, 5, 55, 24)) {
             handleMenuButton();
             return;
         }
     }
 
-    if (y >= NAV_Y) {
-        if (x < 48) {
-            currentState = STATE_MENU;
-        } else if (x < 96) {
-            trackList_currentPage = 0;
-            currentState = STATE_TRACK_LIST;
-        } else if (x < 144) {
-            likesList_currentPage = 0;
-            currentState = STATE_LIKES_LIST;
-        } else if (x >= 192) {
-            currentState = STATE_SETTINGS;
-        } else {
-            return;
-        }
-        focusIndex = 0;
-        drawCurrentStateUI();
-        return;
-    }
-
     switch (currentState) {
         case STATE_MENU: {
-            if (pointInRect(x, y, MENU_BTN_X_LEFT, MENU_BTN_Y[0], MENU_BTN_W, MENU_BTN_H)) { focusIndex = 0; handleSelect(); }
-            else if (pointInRect(x, y, MENU_BTN_X_RIGHT, MENU_BTN_Y[0], MENU_BTN_W, MENU_BTN_H)) { focusIndex = 1; handleSelect(); }
-            else if (pointInRect(x, y, MENU_BTN_X_LEFT, MENU_BTN_Y[1], MENU_BTN_W, MENU_BTN_H)) { focusIndex = 2; handleSelect(); }
-            else if (pointInRect(x, y, MENU_BTN_X_RIGHT, MENU_BTN_Y[1], MENU_BTN_W, MENU_BTN_H)) { focusIndex = 3; handleSelect(); }
-            else if (pointInRect(x, y, 10, 208, SCREEN_W - 20, 62)) { enterState(STATE_PLAYER); }
+            for (int i = 0; i < 6; i++) {
+                if (pointInCircle(x, y, MENU_CELL_CX[i % 3], MENU_CELL_CY[i / 3], MENU_CELL_R)) {
+                    focusIndex = i;
+                    handleSelect();
+                    break;
+                }
+            }
             break;
         }
 
         case STATE_PLAYER: {
-            if (pointInRect(x, y, PL_PREV_X, PL_BTN_Y, PL_PREV_W, PL_BTN_H)) {
+            if (pointInCircle(x, y, PL_PREV_CX, PL_BTN_CY, PL_BTN_R)) {
                 switchTrack(-1);
-            } else if (pointInRect(x, y, PL_PLAY_X, PL_BTN_Y, PL_PLAY_W, PL_BTN_H)) {
+            } else if (pointInCircle(x, y, PL_PLAY_CX, PL_BTN_CY, PL_BTN_R)) {
                 handleEncoderClick();
-            } else if (pointInRect(x, y, PL_NEXT_X, PL_BTN_Y, PL_NEXT_W, PL_BTN_H)) {
+            } else if (pointInCircle(x, y, PL_NEXT_CX, PL_BTN_CY, PL_BTN_R)) {
                 switchTrack(1);
             } else if (pointInRect(x, y, PL_HEART_CX - PL_HEART_R - 6, PL_HEART_CY - PL_HEART_R - 6, (PL_HEART_R + 6) * 2, (PL_HEART_R + 6) * 2)) {
                 toggleLike();
@@ -380,42 +471,40 @@ void processGlobalTouch(int x, int y) {
             }
             if (hit) break;
 
-            if (pointInRect(x, y, 20, 230, 50, 30)) {
+            if (pointInRect(x, y, 20, 204, 50, 28)) {
                 if (page > 0) { (onlyLikes ? likesList_currentPage : trackList_currentPage)--; focusIndex = 0; drawCurrentStateUI(); }
-            } else if (pointInRect(x, y, 170, 230, 50, 30)) {
+            } else if (pointInRect(x, y, SCREEN_W - 70, 204, 50, 28)) {
                 if (page < maxPages - 1) { (onlyLikes ? likesList_currentPage : trackList_currentPage)++; focusIndex = 0; drawCurrentStateUI(); }
             }
             break;
         }
 
         case STATE_SETTINGS: {
-            if (pointInRect(x, y, 10, 48, SCREEN_W - 20, 28)) focusIndex = 0;
-            else if (pointInRect(x, y, 10, 82, SCREEN_W - 20, 28)) focusIndex = 1;
-            else if (pointInRect(x, y, 10, 116, SCREEN_W - 20, 28)) focusIndex = 2;
-            else if (pointInRect(x, y, 10, 150, SCREEN_W - 20, 28)) focusIndex = 3;
-            else if (pointInRect(x, y, 10, 184, SCREEN_W - 20, 28)) focusIndex = 4;
-            else if (pointInRect(x, y, 10, 218, SCREEN_W - 20, 28)) focusIndex = 5;
-            else return;
+            bool hit = false;
+            for (uint8_t i = 0; i < 6; i++) {
+                if (pointInRect(x, y, 10, 34 + i * 30, SCREEN_W - 20, 26)) { focusIndex = i; hit = true; break; }
+            }
+            if (!hit) return;
             handleSelect();
             break;
         }
 
         case STATE_PLAYBACK_SETTINGS: {
-            if (pointInRect(x, y, 10, 55, SCREEN_W - 20, 38)) handleSelect();
+            if (pointInRect(x, y, 10, 40, SCREEN_W - 20, 34)) handleSelect();
             break;
         }
 
         case STATE_SCREEN_SETTINGS: {
             for (uint8_t i = 0; i < 4; i++) {
-                int sx = 12 + i * 57;
-                if (pointInRect(x, y, sx, 95, 51, 30)) { focusIndex = i; handleSelect(); break; }
+                int sx = 12 + i * 76;
+                if (pointInRect(x, y, sx, 78, 70, 32)) { focusIndex = i; handleSelect(); break; }
             }
             break;
         }
 
         case STATE_THEME_SETTINGS: {
             for (uint8_t i = 0; i < 5; i++) {
-                if (pointInRect(x, y, 18, 48 + i * 44, SCREEN_W - 36, 36)) { focusIndex = i; handleSelect(); break; }
+                if (pointInRect(x, y, 18, 36 + i * 34, SCREEN_W - 36, 30)) { focusIndex = i; handleSelect(); break; }
             }
             break;
         }
@@ -427,15 +516,15 @@ void processGlobalTouch(int x, int y) {
         }
 
         case STATE_BT_MANAGER: {
-            if (pointInRect(x, y, 20, 182, SCREEN_W - 40, 34)) { focusIndex = 0; handleSelect(); }
-            else if (pointInRect(x, y, 20, 224, SCREEN_W - 40, 34)) { focusIndex = 1; handleSelect(); }
+            if (pointInRect(x, y, 20, 166, SCREEN_W - 40, 30)) { focusIndex = 0; handleSelect(); }
+            else if (pointInRect(x, y, 20, 202, SCREEN_W - 40, 30)) { focusIndex = 1; handleSelect(); }
             break;
         }
 
         case STATE_BT_SCAN: {
             for (uint8_t i = 0; i < btScanCount; i++) {
-                int rowY = 68 + i * 31;
-                if (pointInRect(x, y, 10, rowY, SCREEN_W - 20, 26)) { focusIndex = i; handleSelect(); return; }
+                int rowY = 52 + i * 27;
+                if (pointInRect(x, y, 10, rowY, SCREEN_W - 20, 24)) { focusIndex = i; handleSelect(); return; }
             }
             break;
         }

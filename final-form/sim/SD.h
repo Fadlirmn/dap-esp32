@@ -28,6 +28,7 @@ public:
     size_t size() const { return size_; }
     int available() const { return 0; }
     int read(uint8_t *, size_t) { return 0; }
+    size_t write(const uint8_t *, size_t len) { return len; }
     bool seek(size_t) { return true; }
     void close() { valid_ = false; }
     const char *name() const { return name_.c_str(); }
