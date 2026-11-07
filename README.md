@@ -1,5 +1,11 @@
 # DAP-Esp32Devkit
 
+![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat&logo=espressif&logoColor=white)
+![Arduino](https://img.shields.io/badge/Arduino-00979D?style=flat&logo=arduino&logoColor=white)
+![Bluetooth](https://img.shields.io/badge/Bluetooth%20A2DP-0082FC?style=flat&logo=bluetooth&logoColor=white)
+![SD Card](https://img.shields.io/badge/SD%20Card-FFC107?style=flat&logo=sdcard&logoColor=black)
+![C++](https://img.shields.io/badge/C++-00599C?style=flat&logo=cplusplus&logoColor=white)
+
 ESP32-based portable audio player (SD card → Bluetooth A2DP source), with a
 rotary encoder + button UI on an ILI9341 display.
 
