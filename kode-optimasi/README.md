@@ -7,9 +7,12 @@ Standalone LVGL 8.x reimplementation of all 12 screens from
 
 **Scope**: this is a UI shell with demo/static sample data (the same text the
 mockups themselves use — "Aurora 3:42", "Favorit · 12 lagu", etc). There is no
-SD-card/audio/Bluetooth/WiFi backend here and none is wired up — that
-integration is a separate, later pass. `../final-form/` is the real firmware
-and is untouched by this folder.
+SD-card/audio/WiFi backend here and none is wired up. **Classic Bluetooth
+(scan/pair/connect) is real**, see `bt_backend.*` below — but it has no audio
+to actually stream yet (no SD/decoder in this folder), so a connected A2DP
+source sends silence until a later pass wires a real PCM feed in. That
+integration (and WiFi/SD) is a separate, later pass. `../final-form/` is the
+real firmware and is untouched by this folder.
 
 ## Galeri
 
@@ -40,11 +43,52 @@ ESP32.
 | L9 / L10 | Volume berubah / senyap | `overlay_volume.*` (one widget, 2 states) |
 | L11 | Daftar playlist | `screen_playlists.*` |
 | L12 | Isi playlist | `screen_playlist_detail.*` |
-| *(baru)* | Pilih Perangkat (RX/TX) | `screen_bt_devices.*` — not one of the original 12 boards; added so BT Receiver/Transmitter have an actual menu to connect to a device from, instead of just claiming "Terhubung" with nothing chosen. Menu's BT tiles go here first; the connected badge on Receiver/Transmitter taps back to it ("ganti perangkat"). |
+| *(baru)* | Pilih Perangkat (RX/TX) | `screen_bt_devices.*` — not one of the original 12 boards; added so BT Receiver/Transmitter have an actual menu to connect to a device from, instead of just claiming "Terhubung" with nothing chosen. Menu's BT tiles go here first; the connected badge on Receiver/Transmitter taps back to it ("ganti perangkat"). On real hardware this screen's two roles genuinely differ (see "Real Bluetooth" below): TX gets a live scan+connect list, RX gets a passive connection-status readout instead of a fake pick-a-phone list. |
 
 Shared chrome/icons/theme: `ui_common.*`, `ui_icons.*`, `ui_theme.h`.
 Lazy screen lifecycle (only one screen's widgets exist at a time, to fit a
 no-PSRAM budget across 9+ screens): `screen_manager.*`.
+Real classic-BT source/sink: `bt_backend.*` (hardware-only, see below).
+
+## Real Bluetooth (`bt_backend.*`)
+
+Ported from `final-form/bluetooth.*` (A2DP source: scan/connect) and
+`final-form/bt_receiver.*` (A2DP sink: connection + AVRCP passthrough), using
+the same [ESP32-A2DP](https://github.com/pschatzmann/ESP32-A2DP) library,
+stripped of their UI coupling since `screen_manager.cpp` owns navigation here
+instead. Not linked into `sim/` (desktop SDL has no real BT radio) — every
+call site in `screen_*.cpp` is `#ifndef KODE_OPTIMASI_SIM`-gated, same pattern
+as the dummy-data gating.
+
+- **One role at a time**: source (Transmitter) XOR sink (Receiver), the same
+  constraint `final-form/` has. Entering a BT screen starts that role
+  on-demand (idempotent — no-op if already that role); no boot-time mode
+  pick like `final-form/` does, since the user switches between them live
+  from the Menu here.
+- **Transmitter (source) — real scan, manual trigger**: entering "Pilih
+  Perangkat" for TX does *not* auto-scan (classic-BT inquiry is slow and
+  power-hungry) — a "Scan" button runs a 10s discovery window
+  (`bt_tx_start_scan()`), with results streaming into the list live (polled
+  every 400ms while active) and tapping a result connecting + saving it
+  (`Preferences`, survives reboot) for auto-reconnect next time.
+- **Receiver (sink) — passive, no scan, no pick-list**: a sink can't "scan"
+  for phones — the phone connects to *it* — so "Pilih Perangkat" for RX is
+  just a status readout (connected device name, or "Menunggu ponsel
+  terhubung...") with a "Lupakan" button to drop the current pairing.
+- **AVRCP passthrough is real**: BT Receiver's play/pause/prev/next buttons
+  send real transport commands to the connected phone (`bt_rx_play_pause()`
+  etc.) — this needs no local decoder since it's just a remote-control
+  signal, same as a BT headset's buttons.
+- **Still a stub**: the source's audio feed is a silence generator
+  (`bt_backend.cpp`'s `tx_fill_silence`, no SD/decoder in this folder yet) and
+  BT Transmitter's own play/pause/prev/next (no local source to control, so
+  they stay demo-only, same as before).
+- Verified by actually compiling this folder for `esp32dev` with the BT
+  backend linked in: links cleanly, but overflows the *default* ESP32
+  partition table (classic-BT stack alone is large) — fixed the same way
+  `final-form/` was, `board_build.partitions = huge_app.csv` in
+  `platformio.ini`. With that: **RAM 26.5% (86.7 KB), Flash 52.8% (1.66 MB
+  of 3 MB)**.
 
 ## Navigation
 
@@ -86,8 +130,10 @@ Real click-driven navigation (not just the demo data):
   clicked once.
 
 **Still demo-only by design**: the battery percentage (`now_playing_set_battery()`
-is a no-op stub) and anything that would need real SD/audio/BT/WiFi hardware
-(song durations/metadata, BT "Terhubung" status, transfer progress, etc).
+is a no-op stub) and anything that would need real SD/audio/WiFi hardware
+(song durations/metadata, transfer progress, etc). BT scan/connect/AVRCP
+*is* real on hardware now — see "Real Bluetooth" above — it's only the sim/
+preview and the actual audio payload that stay demo/silent.
 
 **Click handling itself only responds in the desktop `sim/`** (see below) —
 real hardware has no touch/button input device registered yet (not in the
@@ -123,11 +169,13 @@ is all that's needed to make the same clicks work on-device.
    on Now Playing with its cosmetic demo timers running.
 
 Verified by actually compiling this folder for `esp32dev`/Arduino against real
-`lvgl@8.4.0` + `TFT_eSPI@2.5.43`: links cleanly, **RAM 17.8% (58.2 KB), Flash
-62.8%** on a 320 KB/1.3 MB ESP32 — confirms the no-PSRAM RAM budget holds with
-all 9 screens + 2 overlays linked in (only one screen's widgets exist at a time
-at runtime, per the lazy screen lifecycle in `screen_manager.cpp`). Real
-on-device flashing is still needed to confirm visuals/timing.
+`lvgl@8.4.0` + `TFT_eSPI@2.5.43` + `ESP32-A2DP`: links cleanly — **RAM 26.5%
+(86.7 KB), Flash 52.8% (1.66 MB of 3 MB, via `huge_app.csv`)** — confirms the
+no-PSRAM RAM budget holds with all 9 screens + 2 overlays + the real BT
+source/sink backend linked in (only one screen's widgets exist at a time at
+runtime, per the lazy screen lifecycle in `screen_manager.cpp`; see "Real
+Bluetooth" above for why `huge_app.csv` is needed). Real on-device flashing is
+still needed to confirm visuals/timing/actual pairing.
 
 ## Desktop preview (`sim/`)
 
@@ -174,3 +222,6 @@ This caught three real bugs no static review did:
 - `now_playing_set_battery()` is a no-op stub; the header battery is demo-static
   (explicitly out of scope — everything else that looked like a dummy control
   was wired to real, persistent local state instead, see Navigation above).
+- The BT source's audio feed is silence (no SD/decoder in this folder yet) —
+  scanning/pairing/AVRCP are real, streaming actual music isn't, see "Real
+  Bluetooth" above.

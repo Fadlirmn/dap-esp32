@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Versi dokumen** | 1.4 |
+| **Versi dokumen** | 1.5 |
 | **Tanggal** | 2026-11-08 |
 | **Status** | Reverse-engineered dari kode berjalan (bukan draft rencana) |
-| **Lingkup kode yang didokumentasikan** | `/mnt/seagate/Koding/DAP-Esp32Devkit/kode-optimasi` — 38 file, ~1.700 baris |
-| **Riwayat revisi** | v1.0 (2026-11-08): draf awal. v1.1 (2026-11-08): + ID requirement & acceptance criteria per layar (§4), + diagram navigasi (§6), + metadata versi ini. v1.2 (2026-11-08): + detail lengkap efek transisi/perpindahan menu, efek hover/pressed, interaksi overlay-vs-transisi (§5.6–§5.9); ditemukan & dicatat gap baru: FR-L8 tidak reachable dari UI mana pun. v1.3 (2026-11-08): banyak elemen yang dulu dekoratif sekarang benar-benar nyata (play/pause, prev/next per-track duration, volume persisten + scroll wheel, pilih baris Daftar Lagu/Playlist, badge MENU jadi ikon home, efek tekan universal, jam berhenti saat pause); 2 bug visual nyata ditemukan & diperbaiki (karakter "·" tidak didukung font bawaan, elemen klik tanpa feedback visual sama sekali). v1.4 (2026-11-08): + layar baru **Pilih Perangkat** (`screen_bt_devices.cpp`, FR-NEW-1) di luar 12 board asli — Menu's tile BT Receiver/Transmitter sekarang lewat sini dulu, badge "Terhubung" bisa diklik balik untuk ganti perangkat; data dummy semua layar (termasuk ini) sudah dipisah agar hanya ada di build sim (`KODE_OPTIMASI_SIM`), dikonfirmasi lewat `strings` di ELF ESP32 nyata, bukan cuma baca kode. |
+| **Lingkup kode yang didokumentasikan** | `/mnt/seagate/Koding/DAP-Esp32Devkit/kode-optimasi` — 40 file, ~1.950 baris |
+| **Riwayat revisi** | v1.0 (2026-11-08): draf awal. v1.1 (2026-11-08): + ID requirement & acceptance criteria per layar (§4), + diagram navigasi (§6), + metadata versi ini. v1.2 (2026-11-08): + detail lengkap efek transisi/perpindahan menu, efek hover/pressed, interaksi overlay-vs-transisi (§5.6–§5.9); ditemukan & dicatat gap baru: FR-L8 tidak reachable dari UI mana pun. v1.3 (2026-11-08): banyak elemen yang dulu dekoratif sekarang benar-benar nyata (play/pause, prev/next per-track duration, volume persisten + scroll wheel, pilih baris Daftar Lagu/Playlist, badge MENU jadi ikon home, efek tekan universal, jam berhenti saat pause); 2 bug visual nyata ditemukan & diperbaiki (karakter "·" tidak didukung font bawaan, elemen klik tanpa feedback visual sama sekali). v1.4 (2026-11-08): + layar baru **Pilih Perangkat** (`screen_bt_devices.cpp`, FR-NEW-1) di luar 12 board asli — Menu's tile BT Receiver/Transmitter sekarang lewat sini dulu, badge "Terhubung" bisa diklik balik untuk ganti perangkat; data dummy semua layar (termasuk ini) sudah dipisah agar hanya ada di build sim (`KODE_OPTIMASI_SIM`), dikonfirmasi lewat `strings` di ELF ESP32 nyata, bukan cuma baca kode. v1.5 (2026-11-08): **Bluetooth klasik jadi nyata di hardware** (`bt_backend.h/.cpp`, §3.8, di-port dari `final-form/bluetooth.*`+`bt_receiver.*`) — TX scan manual-trigger 10s + connect + auto-reconnect tersimpan (`Preferences`); RX status koneksi pasif + AVRCP passthrough nyata (play/pause/prev/next ke ponsel terhubung); FR-NEW-1/FR-L4/FR-L5 diupdate untuk bedakan perilaku sim vs hardware (sebelumnya disamakan). Overflow partisi flash default ditemukan & diperbaiki (`huge_app.csv`) — diverifikasi lewat `pio run -e esp32dev` sukses (RAM 26.5%/86.7KB, Flash 52.8%/1.66MB dari 3MB), bukan klaim. |
 
 > **Catatan**: Dokumen ini adalah PRD yang *di-reverse-engineer* dari source code yang sudah ada di `/mnt/seagate/Koding/DAP-Esp32Devkit/kode-optimasi`, bukan PRD untuk fitur yang belum dibuat. Setiap angka, warna, dan perilaku di sini diambil langsung dari kode (per baris dicek ulang saat menulis dokumen ini), bukan dari ingatan/asumsi percakapan.
 
@@ -42,7 +42,8 @@
 - Navigasi klik nyata untuk sebagian jalur (MENU badge, tile Menu, baris Playlists, back-chevron Playlist Detail).
 
 **Non-Goals (sengaja tidak dikerjakan di modul ini)**:
-- **Tidak ada backend nyata**: tidak membaca SD card, tidak decode MP3/I2S, tidak koneksi Bluetooth/A2DP, tidak WiFi AP sungguhan. Semua angka (durasi lagu, SSID, IP, % baterai, status BT "Terhubung") adalah teks statis demo.
+- **Tidak ada backend audio/SD/WiFi nyata**: tidak membaca SD card, tidak decode MP3/I2S, tidak WiFi AP sungguhan. Semua angka durasi lagu/SSID/IP/% baterai adalah teks statis demo.
+- **Bluetooth klasik (scan/pairing/koneksi) SEKARANG NYATA di hardware** (`bt_backend.*`, v1.5) — lihat §3.8 dan FR-NEW-1/FR-L4/FR-L5 untuk detail; satu-satunya bagian yang masih stub adalah payload audio-nya sendiri (sumber A2DP mengirim silence, karena belum ada decoder di modul ini).
 - **Tidak ada input fisik di hardware asli**: `kode-optimasi.ino` tidak mendaftarkan `lv_indev` apa pun (tidak ada touch XPT2046, tidak ada tombol). Klik hanya berfungsi di `sim/` (mouse SDL).
 - **Tidak mengubah `final-form/` atau `dap-ui-landscape/`** — modul berdiri sendiri, tidak ada `#include` lintas-folder.
 - **Tidak semua tombol transport punya handler klik** — lihat §6 untuk daftar pasti mana yang sudah nyata vs sekadar dekoratif.
@@ -122,6 +123,43 @@ Prinsip: **tidak ada bitmap/raster sama sekali**. Dua sumber ikon:
 - `ui_card_create` / `ui_button_create` — kotak rounded generik; button otomatis `LV_OBJ_FLAG_CLICKABLE`.
 - `ui_list_row_create` + `ui_row_text_create` — baris list standar (dipakai Daftar Lagu & Daftar Playlist).
 
+### 3.8 Backend Bluetooth klasik nyata (`bt_backend.h/.cpp`) — baru di v1.5
+
+Di-port dari `final-form/bluetooth.*` (A2DP source: scan/connect) dan
+`final-form/bt_receiver.*` (A2DP sink: koneksi + AVRCP passthrough), pakai
+library [ESP32-A2DP](https://github.com/pschatzmann/ESP32-A2DP) yang sama,
+dilepas dari UI coupling karena `screen_manager.cpp` sudah punya navigasinya
+sendiri. **Tidak ikut di-link ke `sim/`** (desktop SDL tidak punya radio BT
+nyata) — setiap titik panggilnya di `screen_*.cpp` sudah di-gate
+`#ifndef KODE_OPTIMASI_SIM`, pola yang sama dengan gating data dummy.
+
+- **Satu peran aktif pada satu waktu** (source XOR sink), sama seperti
+  `final-form/`. Masuk ke layar BT terkait memulai peran itu sesuai kebutuhan
+  (idempotent), bukan dipilih saat boot seperti `final-form/` — karena di sini
+  user ganti-ganti dari Menu saat berjalan.
+- **Transmitter (source) — scan nyata, dipicu manual**: masuk "Pilih
+  Perangkat" untuk TX **tidak** auto-scan (classic-BT inquiry lambat & boros
+  daya) — tombol "Scan" menjalankan inquiry 10 detik (`bt_tx_start_scan()`),
+  hasil muncul live (di-poll setiap 400ms selama aktif), tap hasil →
+  connect + simpan (`Preferences`, selamat dari reboot) untuk auto-reconnect.
+- **Receiver (sink) — pasif, tidak ada scan/pick-list**: sink tidak bisa
+  "scan" ponsel — ponsel yang menghubungi dia — jadi "Pilih Perangkat" untuk
+  RX cuma status koneksi (nama perangkat terhubung, atau "Menunggu ponsel
+  terhubung...") + tombol "Lupakan" untuk putus pairing saat ini.
+- **AVRCP passthrough nyata**: tombol play/pause/prev/next di BT Receiver
+  mengirim command transport sungguhan ke ponsel yang terhubung
+  (`bt_rx_play_pause()` dkk.) — tidak perlu decoder lokal karena ini cuma
+  sinyal remote-control, sama seperti tombol headset BT.
+- **Masih stub**: sumber A2DP mengirim silence (`tx_fill_silence` di
+  `bt_backend.cpp`, belum ada SD/decoder di modul ini) dan tombol transport
+  BT Transmitter sendiri (tidak ada sumber lokal untuk dikontrol, tetap
+  dekoratif seperti sebelumnya).
+- **Verifikasi nyata**: build `pio run -e esp32dev` dengan backend ini
+  ter-link sukses — tapi overflow partisi default ESP32 (stack classic-BT
+  sendirian sudah besar), diperbaiki sama seperti `final-form/`:
+  `board_build.partitions = huge_app.csv` di `platformio.ini`. Hasil:
+  **RAM 26.5% (86.7 KB), Flash 52.8% (1.66 MB dari 3 MB)**.
+
 ---
 
 ## 4. Requirement Fungsional per Layar (12 board asli + 1 tambahan)
@@ -172,11 +210,13 @@ Legenda status verifikasi yang dipakai di tiap FR di bawah:
 - [x] Footer: "Klik: OK · MENU: kembali".
 
 #### FR-NEW-1 — Pilih Perangkat (RX/TX)
-**File**: `screen_bt_devices.cpp` | **Status**: ✅ render, 🖱️ navigasi penuh | **Tidak ada di 12 board asli**
-- [x] Satu implementasi dipakai 2 kali (`ScreenId` `SCREEN_BT_DEVICES_RX`/`_TX`): header ikon BLUETOOTH + "Pilih Perangkat" + badge MENU + baterai.
-- [x] RX: daftar perangkat yang pernah terhubung (demo: "Pixel 7 - Fadli", "iPhone - Sarah", "Laptop Kerja"). TX: daftar speaker ditemukan (demo: "JBL Flip 6", "Sony SRS-XB13", "Speaker Mobil"). Kosong di build hardware (`KODE_OPTIMASI_SIM`), dengan empty-state ("Tidak ada perangkat yang pernah terhubung" / "Tidak ada speaker ditemukan").
-- [x] Klik baris (🖱️) → `SCREEN_RECEIVER`/`SCREEN_TRANSMITTER`. Badge "Terhubung" di layar tujuan (🖱️, ditambahkan di `screen_receiver.cpp`/`screen_transmitter.cpp`) → balik ke layar ini ("ganti perangkat") — round-trip nyata, diverifikasi via simulasi klik `lv_event_send` end-to-end tanpa crash.
-- [x] Footer: "Klik untuk hubungkan - MENU kembali" (atau "MENU: kembali" saat kosong).
+**File**: `screen_bt_devices.cpp` | **Status**: ✅ render, 🖱️ navigasi penuh, 🔵 BT nyata di hardware (v1.5) | **Tidak ada di 12 board asli**
+- [x] **Di `sim/` (`KODE_OPTIMASI_SIM`)**: satu implementasi dipakai 2 kali (`ScreenId` `SCREEN_BT_DEVICES_RX`/`_TX`), daftar dummy diklik untuk pindah layar — RX: "Pixel 7 - Fadli", "iPhone - Sarah", "Laptop Kerja"; TX: "JBL Flip 6", "Sony SRS-XB13", "Speaker Mobil". Murni kosmetik, tidak ada radio BT di desktop.
+- [x] **Di hardware (v1.5, `bt_backend.*`, lihat §3.8) — dua peran ini genuinely berbeda, bukan sekadar isi dummy yang beda**:
+  - RX: **tidak ada daftar sama sekali** — sink itu pasif (ponsel yang connect ke dia, bukan sebaliknya) — cuma status: nama perangkat terhubung, atau "Menunggu ponsel terhubung...", + tombol "Lupakan".
+  - TX: **scan nyata** — tombol "Scan" memicu classic-BT inquiry 10 detik, hasil muncul live, tap hasil → connect + simpan untuk auto-reconnect (`Preferences`).
+- [x] Klik baris (🖱️, sim) atau klik hasil scan (hardware) → `SCREEN_RECEIVER`/`SCREEN_TRANSMITTER`. Badge "Terhubung" di layar tujuan (🖱️, ditambahkan di `screen_receiver.cpp`/`screen_transmitter.cpp`) → balik ke layar ini ("ganti perangkat") — round-trip nyata, diverifikasi via simulasi klik `lv_event_send` end-to-end tanpa crash (sim) dan via `pio run -e esp32dev` sukses link (hardware, §3.8).
+- [x] Footer: "Klik untuk hubungkan - MENU kembali" (atau "MENU: kembali" saat kosong/RX status layar).
 - [x] Menu's tile "BT Receiver"/"BT Transmitter" sekarang menuju ke sini dulu (bukan langsung ke FR-L4/FR-L5).
 
 #### FR-L4 — BT Receiver
@@ -185,7 +225,8 @@ Legenda status verifikasi yang dipakai di tiap FR di bawah:
 - [x] Kartu hero ungu `COLOR_BT_HERO` 296×110px radius20, ikon bluetooth besar (18px), badge "Terhubung" (hijau+centang) pojok kanan-atas.
 - [x] Caption judul/artis mengikuti track demo yang dipilih (3 pasangan, state persisten `s_track_idx`).
 - [x] **Sengaja tanpa seek bar** — perangkat penerima tidak memiliki posisi transport (sumber dari HP).
-- [x] Tombol prev/next (🖱️): ganti caption judul/artis. Tombol play/pause (🖱️): toggle ikon PLAY/PAUSE (state lokal, tanpa engine audio nyata di baliknya — layar ini tidak terhubung ke reel/timer manapun).
+- [x] Tombol prev/next (🖱️): ganti caption judul/artis (sim) / kirim AVRCP passthrough nyata ke ponsel terhubung — `bt_rx_next()`/`bt_rx_prev()` (hardware, v1.5, §3.8). Tombol play/pause (🖱️): toggle ikon (sim: state lokal) / `bt_rx_play_pause()` nyata (hardware) — tidak perlu engine audio lokal karena ini sinyal remote-control, bukan playback lokal.
+- [x] **Hardware (v1.5)**: caption judul/artis jadi "Audio BT"/nama ponsel terhubung (`bt_rx_device_name()`) alih-alih 3 track demo; sumbernya `screen_bt_devices_rx_create()` memulai peran sink (`bt_backend_start_receiver()`, idempotent) begitu layar ini atau FR-NEW-1 RX dibuka.
 - [x] Footer: "Audio dari ponsel via Bluetooth".
 
 #### FR-L5 — BT Transmitter
@@ -195,6 +236,7 @@ Legenda status verifikasi yang dipakai di tiap FR di bawah:
 - [x] Caption judul + posisi playlist (format "N / 18") mengikuti track demo yang dipilih (3 entri, state persisten `s_track_idx`).
 - [x] **Punya seek bar** (beda dari L4 — perangkat ini sumber audio lokal): nilai demo 22% (statis — tidak di-tick seperti L1, karena layar ini tidak disambungkan ke `demo_cycle`'s elapsed timer).
 - [x] Tombol prev/next (🖱️): ganti caption judul + posisi. Tombol play/pause (🖱️): toggle ikon PLAY/PAUSE (state lokal).
+- [x] **Hardware (v1.5)**: transport tetap dekoratif (tidak ada sumber lokal nyata untuk dikontrol — lihat §3.8); tapi caption judul jadi nama speaker terhubung/tersimpan (`bt_tx_device_name()`) alih-alih 3 track demo, dan koneksi/scan-nya sendiri nyata lewat FR-NEW-1 TX (`bt_backend_start_transmitter()`, idempotent, dipanggil begitu layar ini atau FR-NEW-1 TX dibuka).
 - [x] Footer: "Memutar lokal - keluar via speaker BT".
 
 #### FR-L6 — Transfer File
@@ -405,10 +447,11 @@ Lewat pengujian `sim/`, bukan review statis:
 - PlatformIO butuh 2 flag ekstra yang **tidak jelas dari dokumentasi LVGL** (ditemukan lewat percobaan build nyata): `-D LV_CONF_INCLUDE_SIMPLE=1` dan `-I.` agar `lv_conf.h` lokal proyek ditemukan oleh paket `lvgl/lvgl` generik.
 
 ### 7.3 Verifikasi yang sudah dijalankan (bukan klaim, tapi hasil build/run nyata)
-1. `pio run` (`esp32dev`, framework Arduino) — **sukses**, RAM 17,8%, Flash 62,8%.
+1. `pio run` (`esp32dev`, framework Arduino) — **sukses**, RAM 17,8%, Flash 62,8% (sebelum backend BT, §3.8 ditambahkan).
 2. `sim/make sim` — clone `lvgl` asli (bukan stub) via git, compile `.c` LVGL dengan `gcc` (bukan `g++`, karena `g++` menolak kode C valid seperti konversi implisit `void*`→`T*`), link dengan sumber `.cpp` aplikasi asli tanpa modifikasi.
 3. `sim/./sim` dijalankan di bawah `gdb` selama 60–180 detik tanpa crash, melewati banyak siklus overlay + navigasi klik manual.
 4. Screenshot/analisis manual tidak dilakukan (tooling screenshot headless tidak tersedia di environment ini) — verifikasi visual terakhir tetap perlu dilakukan manual oleh pengguna di layar sim atau hardware asli.
+5. **v1.5**: `pio run -e esp32dev` dengan `bt_backend.cpp` + lib `ESP32-A2DP` ter-link — percobaan pertama **overflow flash** (126,7% dari partisi default, stack classic-BT besar), diperbaiki dengan `board_build.partitions = huge_app.csv`; rebuild setelah fix **sukses**, RAM 26,5% (86,7 KB), Flash 52,8% (1,66 MB dari 3 MB). `sim/make sim` diulang setelah perubahan ini dan tetap sukses (file BT tidak ikut di-link ke sim, by design).
 
 ### 7.4 Prinsip desain yang dipegang konsisten
 - **Tidak ada bitmap/raster untuk animasi atau ikon** — vektor (`lv_line`+transform) atau glyph font bawaan saja.
@@ -422,12 +465,13 @@ Lewat pengujian `sim/`, bukan review statis:
 | Risiko/Limitasi | Dampak | Status |
 |---|---|---|
 | Tidak ada indev di hardware asli | Navigasi klik yang sudah dibuat tidak bisa dipicu di device fisik | Disengaja, di luar lingkup awal |
-| Tombol transport (prev/play/next) di FR-L1/FR-L4/FR-L5, tombol aksi di FR-L12, baris di FR-L2 belum punya handler | Terlihat seperti bisa diklik tapi tidak melakukan apa-apa | Belum dikerjakan — lihat §9 |
+| Tombol transport (prev/play/next) di FR-L1/FR-L5, tombol aksi di FR-L12, baris di FR-L2 belum punya handler nyata | Terlihat seperti bisa diklik tapi tidak melakukan apa-apa (kecuali FR-L4/BT Receiver, yang sejak v1.5 nyata lewat AVRCP passthrough — §3.8) | Belum dikerjakan — lihat §9 |
 | `now_playing_set_battery()` adalah stub no-op | Baterai header selalu statis 78%, tidak bisa diubah lewat API publik | Didokumentasikan sebagai `ponytail:` di kode |
 | Resume animasi reel mulai dari 0°, bukan posisi terakhir | Efek visual minor, tidak terlihat jelas karena rotasi simetris | Disengaja, kosmetik saja |
 | Font bold tidak tersedia (LVGL bawaan) | Judul lagu pakai regular 18px, bukan bold | Perlu font custom via `lv_font_conv` kalau mau bold asli |
 | `LV_MEM_SIZE` 24 KB belum diuji dengan worst-case nyata (overlay + layar kompleks bersamaan) | Risiko OOM di kombinasi tertentu belum 100% tereliminasi di hardware asli | Perlu uji nyata di device, bukan hanya sim |
-| Tidak ada SD/audio/BT/WiFi nyata | Semua data adalah teks statis | Disengaja, lingkup "UI shell" |
+| Tidak ada SD/audio/WiFi nyata | Semua data durasi/SSID/IP/transfer adalah teks statis | Disengaja, lingkup "UI shell" |
+| BT klasik nyata (v1.5) tapi sumber A2DP kirim silence | Pairing/scan/AVRCP bekerja sungguhan, tapi belum ada musik sungguhan mengalir (butuh SD+decoder, di luar lingkup modul ini) | Disengaja — lihat §3.8, §9 |
 | **FR-L8 (Beralih Mode) tidak reachable dari UI mana pun** (§5.9) | Layar transisi ganti-mode sudah lengkap di kode tapi tidak pernah terpanggil — tidak bisa dilihat/diuji lewat navigasi biasa | Regresi dari penghapusan auto-cycle layar (§5.5) — perlu rute klik baru atau trigger dari logika ganti-mode nyata |
 | Tidak ada efek hover/pressed di elemen apa pun (§5.7) | Klik terasa "tanpa respons instan" sebelum efek akhirnya muncul (ganti layar/overlay) | Disengaja (konsekuensi dari `lv_obj_remove_style_all` di semua factory), bisa ditambah style pressed kalau UX dirasa kurang responsif |
 
@@ -436,8 +480,8 @@ Lewat pengujian `sim/`, bukan review statis:
 ## 9. Roadmap (di luar lingkup modul ini, untuk pass integrasi berikutnya)
 
 1. **Input nyata di hardware**: tambahkan `lv_indev` touch (XPT2046, seperti `final-form`) atau tombol fisik ke `kode-optimasi.ino`, agar handler klik yang sudah ada di §6 bisa dipicu di device.
-2. **Lengkapi handler klik yang masih kosong**: tombol transport FR-L1/FR-L4/FR-L5 (toggle play/pause nyata, panggil `now_playing_set_playing()`), baris FR-L2 (play lagu), 3 tombol aksi FR-L12.
-3. **Integrasi backend nyata**: ganti data demo dengan pembacaan SD card (daftar lagu/playlist), status BT A2DP nyata, status WiFi AP nyata, level baterai ADC nyata (lewat `now_playing_set_battery()` yang sudah ada API-nya tapi masih stub).
+2. **Lengkapi handler klik yang masih kosong**: tombol transport FR-L1/FR-L5 (toggle play/pause nyata, panggil `now_playing_set_playing()`), baris FR-L2 (play lagu), 3 tombol aksi FR-L12. (FR-L4/BT Receiver sudah nyata sejak v1.5, §3.8.)
+3. **Integrasi backend nyata yang masih tersisa**: ganti data demo dengan pembacaan SD card (daftar lagu/playlist), status WiFi AP nyata, level baterai ADC nyata (lewat `now_playing_set_battery()` yang sudah ada API-nya tapi masih stub). BT A2DP klasik (scan/pair/AVRCP) **sudah nyata sejak v1.5** (`bt_backend.*`, §3.8) — yang tersisa cuma menyambungkan payload audio sumbernya ke SD+decoder nyata (sekarang kirim silence).
 4. **Isi `audioTaskStub`**: pipeline decode/output I2S nyata di core 0, sesuai kerangka yang sudah disiapkan.
 5. **Font bold asli** (opsional) kalau kesetiaan visual terhadap spek awal dianggap penting.
 6. **Buat FR-L8 bisa diakses lagi** (§5.9): tambah rute klik demonstrasi (mis. dari tombol BT di Menu) atau sambungkan ke logika ganti-mode operasi nyata saat itu dibangun.

@@ -14,6 +14,7 @@
 #include "display_pins.h"
 #include "screen_manager.h"
 #include "demo_cycle.h"
+#include "bt_backend.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -46,6 +47,7 @@ static void guiTask(void *pv) {
         lv_tick_inc(now_ms - last_ms);
         last_ms = now_ms;
         lv_timer_handler();
+        bt_backend_tick(); // cheap: just checks the BT scan timeout, see bt_backend.cpp
         vTaskDelay(pdMS_TO_TICKS(66)); // 15 FPS: drives redraw + the cassette reel anim
     }
 }

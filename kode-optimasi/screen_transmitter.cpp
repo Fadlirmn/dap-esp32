@@ -6,6 +6,9 @@
 #include "ui_theme.h"
 #include "display_pins.h"
 #include "screen_manager.h"
+#ifndef KODE_OPTIMASI_SIM
+#include "bt_backend.h"
+#endif
 
 static void badge_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
@@ -37,8 +40,15 @@ static lv_obj_t *s_pos_lbl = NULL;
 static lv_obj_t *s_play_icon = NULL;
 
 static void refresh_track_labels(void) {
+#ifdef KODE_OPTIMASI_SIM
     if (s_title_lbl) lv_label_set_text(s_title_lbl, kDemoTracks[s_track_idx].title);
     if (s_pos_lbl) lv_label_set_text_fmt(s_pos_lbl, "%d / 18", kDemoTracks[s_track_idx].pos);
+#else
+    // No local source/playlist exists in this module -- show the real BT
+    // connection target instead of a fake track position (bt_backend.cpp).
+    if (s_title_lbl) lv_label_set_text(s_title_lbl, bt_tx_connected() ? bt_tx_device_name() : "Tidak ada speaker");
+    if (s_pos_lbl) lv_label_set_text(s_pos_lbl, "-");
+#endif
 }
 
 static void play_pause_clicked_cb(lv_event_t *e) {

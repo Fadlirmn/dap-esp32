@@ -6,6 +6,9 @@
 #include "ui_theme.h"
 #include "display_pins.h"
 #include "screen_manager.h"
+#ifndef KODE_OPTIMASI_SIM
+#include "bt_backend.h"
+#endif
 
 static void badge_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
@@ -16,46 +19,60 @@ static void badge_clicked_cb(lv_event_t *e) {
 // exists in this standalone module, but play/pause and prev/next actually
 // change what's displayed, and that state survives screen rebuilds.
 static bool s_is_playing = true;
-struct DemoTrack { const char *title; const char *artist; };
 #ifdef KODE_OPTIMASI_SIM
+struct DemoTrack { const char *title; const char *artist; };
 static const DemoTrack kDemoTracks[] = {
     {"City Lights", "Neon Harbor"},
     {"Aurora", "Night Drive"},
     {"Echoes", "Velvet Skyline"},
 };
-#else
-// No real BT stream info in the real build -- a future pass wires this to
-// the actual A2DP metadata.
-static const DemoTrack kDemoTracks[] = {
-    {"Tidak ada lagu", ""},
-};
-#endif
 #define DEMO_TRACK_COUNT (int)(sizeof(kDemoTracks) / sizeof(kDemoTracks[0]))
 static int s_track_idx = 0;
+#endif
 static lv_obj_t *s_title_lbl = NULL;
 static lv_obj_t *s_artist_lbl = NULL;
 static lv_obj_t *s_play_icon = NULL;
 
 static void refresh_track_labels(void) {
+#ifdef KODE_OPTIMASI_SIM
     if (s_title_lbl) lv_label_set_text(s_title_lbl, kDemoTracks[s_track_idx].title);
     if (s_artist_lbl) lv_label_set_text(s_artist_lbl, kDemoTracks[s_track_idx].artist);
+#else
+    // No AVRCP track metadata wired yet -- just show connection status
+    // (bt_backend.cpp owns the real sink connection).
+    if (s_title_lbl) lv_label_set_text(s_title_lbl, bt_rx_connected() ? "Audio BT" : "Tidak ada lagu");
+    if (s_artist_lbl) lv_label_set_text(s_artist_lbl, bt_rx_device_name());
+#endif
 }
 
 static void play_pause_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
+#ifdef KODE_OPTIMASI_SIM
     s_is_playing = !s_is_playing;
+#else
+    bt_rx_play_pause();
+    s_is_playing = bt_rx_is_playing();
+#endif
     if (s_play_icon) lv_label_set_text(s_play_icon, s_is_playing ? LV_SYMBOL_PAUSE : LV_SYMBOL_PLAY);
 }
 
 static void prev_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
+#ifdef KODE_OPTIMASI_SIM
     s_track_idx = (s_track_idx - 1 + DEMO_TRACK_COUNT) % DEMO_TRACK_COUNT;
+#else
+    bt_rx_prev(); // AVRCP passthrough -- tells the connected phone to skip back
+#endif
     refresh_track_labels();
 }
 
 static void next_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
+#ifdef KODE_OPTIMASI_SIM
     s_track_idx = (s_track_idx + 1) % DEMO_TRACK_COUNT;
+#else
+    bt_rx_next(); // AVRCP passthrough -- tells the connected phone to skip forward
+#endif
     refresh_track_labels();
 }
 
@@ -65,6 +82,10 @@ static void on_screen_deleted(lv_event_t *e) {
 }
 
 void screen_receiver_create(lv_obj_t *parent) {
+#ifndef KODE_OPTIMASI_SIM
+    bt_backend_start_receiver(); // idempotent -- no-op if already the sink
+    s_is_playing = bt_rx_is_playing();
+#endif
     lv_obj_t *scr = parent;
     ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "BT Receiver", true, 78);
 
@@ -89,16 +110,15 @@ void screen_receiver_create(lv_obj_t *parent) {
     lv_obj_clear_flag(caption, LV_OBJ_FLAG_SCROLLABLE);
 
     s_title_lbl = lv_label_create(caption);
-    lv_label_set_text(s_title_lbl, kDemoTracks[s_track_idx].title);
     lv_obj_set_style_text_color(s_title_lbl, lv_color_white(), 0);
     lv_obj_set_style_text_font(s_title_lbl, FONT_BODY, 0);
     lv_obj_align(s_title_lbl, LV_ALIGN_LEFT_MID, 0, -6);
 
     s_artist_lbl = lv_label_create(caption);
-    lv_label_set_text(s_artist_lbl, kDemoTracks[s_track_idx].artist);
     lv_obj_set_style_text_color(s_artist_lbl, COLOR_TEXT_MUTED, 0);
     lv_obj_set_style_text_font(s_artist_lbl, FONT_SMALL, 0);
     lv_obj_align(s_artist_lbl, LV_ALIGN_LEFT_MID, 0, 6);
+    refresh_track_labels();
 
     lv_obj_t *prev_btn = ui_button_create(scr, 88, 166, 36, 36, RADIUS_BUTTON_CIRCLE, COLOR_SURFACE_BUTTON);
     lv_obj_center(icon_symbol(prev_btn, LV_SYMBOL_PREV, COLOR_TEXT_PRIMARY, FONT_BODY));
