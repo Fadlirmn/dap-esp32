@@ -13,6 +13,9 @@ rotary encoder + button UI on an ILI9341 display.
 
 - **`final-form/`** — the firmware. Start here. See `final-form/README.md`
   for wiring, controls, SD card layout, and build instructions.
+- **`kode-optimasi/`** — standalone LVGL 8.x port of all 12 UI boards (not
+  wired into `final-form/`). Has its own desktop SDL preview (`sim/`) and
+  screenshot gallery — see `kode-optimasi/README.md`.
 - **`old/`** — original/reference material kept for history:
   - `old/Stream32-ESP-Player.ino` — the original full-feature UI/player this
     project's feature set was ported from (different hardware: TFT_eSPI +
