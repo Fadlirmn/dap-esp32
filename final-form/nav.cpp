@@ -39,7 +39,7 @@ void loadOperatingMode() {
 
 void enterModeSelect() {
     currentState = STATE_MODE_SELECT;
-    focusIndex = (int)operatingMode;
+    focusIndex = (int)operatingMode + 2;  // cells 0/1 are Daftar Lagu/Playlist, modes start at cell 2
     drawCurrentStateUI();
 }
 
@@ -99,7 +99,12 @@ static int resetConfirmCount() { return 2; }
 static int btManagerCount() { return 2; }
 static int screenTimeoutCount() { return 4; }
 static int menuGridCount() { return 6; }  // Player/Tracks/Playlists/Likes/Settings/Mode-switch
-static int modeSelectCount() { return 5; }  // Local Player/BT Receiver/BT Transmitter/Transfer File/Kembali
+// L_Menu.dc.html's 2-column grid: Daftar Lagu/Playlist/Local Player/BT
+// Receiver/BT Transmitter/Transfer File/Kembali. Row-major flat index 0..6 --
+// PREV/NEXT just walk this flat index by +-1 (moveFocus below), same as
+// STATE_MENU's own 2x3 grid above: that's the "2D grid" math this hardware
+// needs, since there's no separate left/right input, only PREV/NEXT.
+static int modeSelectCount() { return MODE_GRID_COUNT; }
 static int playlistsCount() { return totalPlaylists; }
 
 // Which playlist STATE_PLAYLIST_DETAIL is showing. ponytail: no paging within
@@ -181,8 +186,14 @@ static void handleSelect() {
             if (playPlaylistTrack(playlist_selectedIndex, focusIndex)) enterState(STATE_PLAYER);
             break;
         case STATE_MODE_SELECT:
-            if (focusIndex == 4) { enterState(homeStateForMode()); }  // Kembali
-            else selectOperatingMode((OperatingMode)focusIndex);
+            // Cell order: 0 Daftar Lagu, 1 Playlist, 2-5 the 4 operating
+            // modes, 6 Kembali (see drawModeSelectScreen's `labels`).
+            switch (focusIndex) {
+                case 0: trackList_currentPage = 0; enterState(STATE_TRACK_LIST); break;
+                case 1: enterState(STATE_PLAYLISTS); break;
+                case 6: enterState(homeStateForMode()); break;
+                default: selectOperatingMode((OperatingMode)(focusIndex - 2)); break;
+            }
             break;
         case STATE_SETTINGS:
             switch (focusIndex) {

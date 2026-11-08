@@ -193,32 +193,42 @@ void drawMusicNoteGlyph(int cx, int cy, int size, uint16_t color) {
     tft.drawCircle(X(16), Y(16), r, color);
 }
 
-// "Flow direction" glyph for the BT Transmitter panel: `M4 12h14 / M13 6l6 6-6 6`.
-void drawFlowArrowIcon(int cx, int cy, int size, uint16_t color) {
+// Shuffle glyph (`M16 3h5v5 M4 20L21 3 M21 16v5h-5 M15 15l6 6 M4 4l5 5`):
+// two crossing diagonal arrows, arrowhead corners approximated with straight
+// lines (Adafruit_GFX has no arc primitive). Decorative only -- no
+// shuffle-state exists anywhere in this codebase.
+void drawShuffleIcon(int cx, int cy, int size, uint16_t color) {
     float s = size / 10.0f;
     auto X = [&](float vx) { return cx + (int)((vx - 12) * s); };
     auto Y = [&](float vy) { return cy + (int)((vy - 12) * s); };
-    tft.drawLine(X(4), Y(12), X(18), Y(12), color);
-    tft.drawLine(X(13), Y(6), X(19), Y(12), color);
-    tft.drawLine(X(19), Y(12), X(13), Y(18), color);
+    tft.drawLine(X(4), Y(4), X(9), Y(9), color);
+    tft.drawLine(X(4), Y(20), X(21), Y(3), color);
+    tft.drawLine(X(16), Y(3), X(21), Y(3), color);
+    tft.drawLine(X(21), Y(3), X(21), Y(8), color);
+    tft.drawLine(X(15), Y(15), X(21), Y(21), color);
+    tft.drawLine(X(21), Y(16), X(21), Y(21), color);
+    tft.drawLine(X(21), Y(21), X(16), Y(21), color);
 }
 
-// Local Player panel's twin "signal" glyph: circle + center dot + 4 lines
-// radiating past the circle's edge (`M26 6v10` etc. in the mockup's 52x52
-// viewBox). `size` ~ the icon's outer radius budget.
-void drawRadialSignalIcon(int cx, int cy, int size, uint16_t color) {
-    int r = (size * 85) / 100;
-    if (r < 3) r = 3;
-    tft.drawCircle(cx, cy, r, color);
-    int dotR = size / 7;
-    if (dotR < 1) dotR = 1;
-    tft.fillCircle(cx, cy, dotR, color);
-    int ext = size - r;
-    if (ext < 3) ext = 3;
-    tft.drawLine(cx, cy - r, cx, cy - r - ext, color);
-    tft.drawLine(cx, cy + r, cx, cy + r + ext, color);
-    tft.drawLine(cx - r, cy, cx - r - ext, cy, color);
-    tft.drawLine(cx + r, cy, cx + r + ext, cy, color);
+// Repeat glyph (`M17 1l4 4-4 4 M3 11V9a4 4 0 014-4h14 M7 23l-4-4 4-4
+// M21 13v2a4 4 0 01-4 4H3`): a loop top+bottom, each with an arrowhead;
+// the two quarter-circle arcs are approximated with a single diagonal line
+// (same convention drawUploadIcon's chevron uses). Decorative only -- no
+// repeat-state exists anywhere in this codebase.
+void drawRepeatIcon(int cx, int cy, int size, uint16_t color) {
+    float s = size / 10.0f;
+    auto X = [&](float vx) { return cx + (int)((vx - 12) * s); };
+    auto Y = [&](float vy) { return cy + (int)((vy - 12) * s); };
+    tft.drawLine(X(17), Y(1), X(21), Y(5), color);
+    tft.drawLine(X(21), Y(5), X(17), Y(9), color);
+    tft.drawLine(X(3), Y(11), X(3), Y(9), color);
+    tft.drawLine(X(3), Y(9), X(7), Y(5), color);
+    tft.drawLine(X(7), Y(5), X(21), Y(5), color);
+    tft.drawLine(X(7), Y(23), X(3), Y(19), color);
+    tft.drawLine(X(3), Y(19), X(7), Y(15), color);
+    tft.drawLine(X(21), Y(13), X(21), Y(15), color);
+    tft.drawLine(X(21), Y(15), X(17), Y(19), color);
+    tft.drawLine(X(17), Y(19), X(3), Y(19), color);
 }
 
 // Upload/"transfer" glyph (`M12 16V4` + `M7 9l5-5 5 5` chevron + `M5 20h14`
@@ -269,7 +279,7 @@ void maskCoverCorners(int x, int y, int w, int h, int radius) {
 // MENU-button-driven, see nav.cpp's handleMenuButton), and there is no
 // bluetooth indicator in the header at all (BT screens show their own
 // connection-status chip under the main panel instead, see screens.cpp).
-void drawHeader(const char *title, uint8_t headerIcon) {
+void drawHeader(const char *title, uint8_t headerIcon, bool showMenuChip) {
     tft.fillRect(0, 0, SCREEN_W, HEADER_H, COLOR_PANEL);
     tft.drawFastHLine(0, HEADER_H, SCREEN_W, COLOR_PANEL_BORDER);
     int midY = HEADER_H / 2;
@@ -282,14 +292,15 @@ void drawHeader(const char *title, uint8_t headerIcon) {
             case HICON_BACK: drawBackIcon(iconCx, midY, 7, COLOR_TEXT_PRIMARY); break;
             case HICON_BT: drawBluetoothZigzag(iconCx, midY, 7, COLOR_TEXT_PRIMARY); break;
             case HICON_TRANSFER: drawUploadIcon(iconCx, midY, 7, COLOR_TEXT_PRIMARY); break;
+            case HICON_PLAYLIST: drawPlaylistIcon(iconCx, midY, 7, COLOR_TEXT_PRIMARY); break;
         }
         textX = iconCx + 12;
     }
     tft.setTextColor(COLOR_TEXT_PRIMARY, COLOR_PANEL);
     gfxDrawString(tft, title, textX, midY - 4, fontToSize(2), GFX_TL);
 
-    // Battery, far right.
-    int battW = 18, battH = 10;
+    // Battery, far right (L_*.dc.html's battery svg: 18x11 body + nub).
+    int battW = 18, battH = 11;
     int battX = SCREEN_W - 10 - battW - 2;
     int battY = midY - battH / 2;
     String pctStr = String(DUMMY_BATTERY_PCT) + "%";
@@ -298,10 +309,12 @@ void drawHeader(const char *title, uint8_t headerIcon) {
     gfxDrawString(tft, pctStr, battX - 6, midY - 3, 1, GFX_TR);
     drawBatteryIcon(battX, battY, battW, battH, DUMMY_BATTERY_PCT);
 
-    // MENU chip, just left of the battery/% block.
+    // MENU chip, just left of the battery/% block -- skipped on L_Menu.dc.html's
+    // own "Menu" screen (STATE_MODE_SELECT), which has no chip at all.
+    if (!showMenuChip) return;
     const char *chipLabel = "MENU";
     int chipTextW = gfxTextWidth(tft, chipLabel, 1);
-    int chipIconW = 12, chipH = 18;
+    int chipIconW = 12, chipH = 20;
     int chipW = 10 + chipIconW + 4 + chipTextW + 8;
     int chipX = battX - 6 - pctW - 10 - chipW;
     int chipY = midY - chipH / 2;
