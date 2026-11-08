@@ -188,7 +188,7 @@ static void doReset() {
     autoPlayEnabled = false;
     bt_volume = 70;
     screenTimeoutMinutes = 0;
-    themeIndex = 0;
+    themeIndex = 1;  // matches dap-ui-landscape's accent, same default as a blank/first boot
     applyTheme(themeIndex);
     hasSavedBTAddress = false;
     savedBTDevice = "No device saved";

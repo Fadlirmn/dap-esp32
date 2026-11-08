@@ -96,7 +96,7 @@ void setup() {
 
     preferences.begin("screen_pref", true);
     screenTimeoutMinutes = preferences.getUChar("timeout", 0);
-    themeIndex = preferences.getUChar("theme", 0);
+    themeIndex = preferences.getUChar("theme", 1);  // 1 = Blue, matches dap-ui-landscape's accent
     preferences.end();
     applyTheme(themeIndex);
 

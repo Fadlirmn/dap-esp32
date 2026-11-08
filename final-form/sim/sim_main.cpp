@@ -63,7 +63,7 @@ int main() {
     tft.begin();
     tft.setRotation(0);
     initColorTheme();
-    applyTheme(0);
+    applyTheme(1);  // theme 1 (Blue) is the default matching dap-ui-landscape's #A8C8FF accent
 
     loadOperatingMode();
     // SIM_MODE=0..3 overrides the boot mode for testing/demo (sim's stub

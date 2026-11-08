@@ -56,7 +56,11 @@ private:
 class SDClass {
 public:
     bool begin(int = -1) { return true; }
-    bool exists(const String &) { return false; }
+    // Matches open()'s own idea of what's "there": /tracks always fakes a
+    // successful dir listing below, so exists() must agree -- otherwise
+    // nav.cpp's checkSDHealth() (a real runtime probe, not a sim-only thing)
+    // sees a false "/tracks" missing" on every tick and never clears it.
+    bool exists(const String &path) { return path == "/tracks"; }
     bool mkdir(const String &) { return true; }
     bool remove(const String &) { return true; }
     bool rename(const String &, const String &) { return true; }
