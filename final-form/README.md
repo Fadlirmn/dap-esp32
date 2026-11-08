@@ -76,10 +76,15 @@ PlatformIO (recommended — `platformio.ini` + `Makefile` already set up):
 
 ```
 cd final-form
-make build            # pio run
-make upload           # pio run -t upload   [PORT=/dev/ttyUSB0]
-make monitor          # pio device monitor  [PORT=/dev/ttyUSB0]
+make build                        # pio run
+make upload PORT=/dev/ttyUSB0     # pio run -t upload
+make monitor PORT=/dev/ttyUSB0    # pio device monitor, 115200 baud
 ```
+
+Find the port after plugging the board in: `ls /dev/ttyUSB*` or
+`/dev/ttyACM*` (Linux), `ls /dev/cu.*` (macOS). `PORT` is optional — PlatformIO
+auto-detects it if omitted, but pass it explicitly when more than one
+serial device is connected.
 
 `platformio.ini` pulls every dependency via `lib_deps` (including
 `pschatzmann/ESP32-A2DP` by git URL — it isn't published on the PlatformIO
