@@ -9,6 +9,13 @@
 ESP32-based portable audio player (SD card → Bluetooth A2DP source), with a
 rotary encoder + button UI on an ILI9341 display.
 
+<p align="center">
+  <img src="kode-optimasi/screenshots/01-now-playing.png" width="200" alt="Now Playing">
+  <img src="kode-optimasi/screenshots/03-menu-mode.png" width="200" alt="Menu mode">
+  <img src="kode-optimasi/screenshots/08-daftar-playlist.png" width="200" alt="Daftar playlist">
+</p>
+<p align="center"><em>LVGL UI preview (<code>kode-optimasi/</code>) — more screenshots in <a href="kode-optimasi/README.md">kode-optimasi/README.md</a></em></p>
+
 ## Layout
 
 - **`final-form/`** — the firmware. Start here. See `final-form/README.md`
