@@ -11,3 +11,11 @@ extern String btrx_deviceName;  // connected phone's name once known, else "No d
 
 void btReceiverSetup();                        // call once in setup() when operatingMode == MODE_BT_RECEIVER
 void btReceiverSetVolume(uint8_t volume0to127);  // called from nav.cpp's encoder-rotate handler
+
+// AVRCP passthrough transport controls: this device is the sink, so
+// "play/pause/next/prev" means telling the connected PHONE to do that
+// (there's no local track to control) -- the dap-ui-landscape mockup shows
+// these buttons on the BT Receiver screen, nav.cpp wires them to these.
+void btReceiverPlayPause();
+void btReceiverNext();
+void btReceiverPrev();

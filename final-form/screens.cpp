@@ -671,29 +671,35 @@ void drawModeSelectScreen() {
 // target name + progress bar + description, centered. No header/footer: the
 // device restarts ~600ms after this draws (see nav.cpp's
 // selectOperatingMode()), so there's nothing to navigate back to.
-// Deviation: the mockup's icon box is colored/iconed for the SPECIFIC
-// destination mode and names it ("BT Receiver"), but selectOperatingMode()
-// (nav.cpp, off-limits to edit outside the STATE_MODE_SELECT grid-nav change)
-// never stores which mode is being switched TO anywhere screens.cpp can read
-// -- it writes straight to Preferences and only takes effect after
-// ESP.restart(). So this draws a generic swap icon/neutral panel and a
-// generic "Beralih mode..." label instead of the real target; the progress
-// fill is a fixed decorative value (there's no real per-tick progress to
-// track during a single blocking delay(600)).
+// switchingToMode (nav.h) is set by selectOperatingMode() right before this
+// draws, so the icon + name shown are the real destination mode, matching the
+// mockup -- reusing the exact icon-drawing functions drawModeSelectScreen
+// already uses for each of these 4 modes. Progress fill stays a fixed
+// decorative value (there's no real per-tick progress to track during a
+// single blocking delay(600)).
 void drawModeSwitchingScreen() {
     tft.fillScreen(COLOR_BG);
     int boxSize = 84, boxX = 40, boxY = SCREEN_H / 2 - boxSize / 2;
     tft.fillRoundRect(boxX, boxY, boxSize, boxSize, 28, COLOR_PANEL);
-    drawSwapIcon(boxX + boxSize / 2, boxY + boxSize / 2, 18, COLOR_ACCENT);
+
+    int iconCx = boxX + boxSize / 2, iconCy = boxY + boxSize / 2;
+    const char *modeName;
+    switch (switchingToMode) {
+        case MODE_LOCAL_PLAYER:   modeName = "Local Player";   drawMusicNoteGlyph(iconCx, iconCy, 20, COLOR_ACCENT); break;
+        case MODE_BT_RECEIVER:    modeName = "BT Receiver";    drawBluetoothZigzag(iconCx, iconCy, 20, COLOR_ACCENT); break;
+        case MODE_BT_TRANSMITTER: modeName = "BT Transmitter"; drawBluetoothZigzag(iconCx, iconCy, 20, COLOR_ACCENT); break;
+        case MODE_TRANSFER_FILE:  modeName = "Transfer File";  drawUploadIcon(iconCx, iconCy, 20, COLOR_ACCENT); break;
+        default:                 modeName = "";                drawSwapIcon(iconCx, iconCy, 18, COLOR_ACCENT); break;
+    }
 
     int textX = boxX + boxSize + 20;
     int textW = SCREEN_W - 28 - textX;
     tft.setTextColor(COLOR_TEXT_SECONDARY, COLOR_BG);
-    gfxDrawString(tft, "Beralih mode", textX, SCREEN_H / 2 - 32, 1, GFX_TL);
+    gfxDrawString(tft, "Beralih ke", textX, SCREEN_H / 2 - 32, 1, GFX_TL);
     tft.setTextColor(COLOR_TEXT_PRIMARY, COLOR_BG);
-    gfxDrawString(tft, "Mohon tunggu...", textX, SCREEN_H / 2 - 14, fontToSize(2), GFX_TL);
+    gfxDrawString(tft, modeName, textX, SCREEN_H / 2 - 16, fontToSize(4), GFX_TL);
 
-    int barY = SCREEN_H / 2 + 14, barW = min(150, textW), barH = 4;
+    int barY = SCREEN_H / 2 + 18, barW = min(150, textW), barH = 4;
     tft.fillRoundRect(textX, barY, barW, barH, barH / 2, COLOR_TRACK_BG);
     tft.fillRoundRect(textX, barY, (barW * 35) / 100, barH, barH / 2, COLOR_ACCENT);
 
@@ -845,6 +851,46 @@ void drawVolumeOverlay() {
     gfxDrawString(tft, pctStr, VOL_OVERLAY_X + VOL_OVERLAY_W - 14, iconCy - 7, fontToSize(2), GFX_TR);
 }
 
+// Low-battery dialog (L_Overlays.dc.html): centered card over whatever's
+// already drawn (no fillScreen -- same "paint on top" architecture as
+// drawVolumeOverlay). Card bg #272A30 == COLOR_BUTTON_BG; OK text #A8C8FF is
+// exactly COLOR_ACCENT under the default theme (themeIndex 1). No tappable OK
+// widget: nav.cpp's handleEncoderClick() dismisses the flag on any click
+// while it's active, this is just the label.
+void drawLowBatteryOverlay() {
+    int cardX = 30, cardY = 28, cardW = SCREEN_W - 60, cardH = 110, pad = 16;
+    tft.fillRoundRect(cardX, cardY, cardW, cardH, 20, COLOR_BUTTON_BG);
+
+    int iconX = cardX + pad, iconY = cardY + pad + 2;
+    drawLowBatteryIcon(iconX, iconY, 18, 11, COLOR_ERROR);
+
+    int titleX = iconX + 22 + 8;
+    tft.setTextColor(COLOR_TEXT_PRIMARY, COLOR_BUTTON_BG);
+    gfxDrawString(tft, "Baterai rendah", titleX, cardY + pad - 2, fontToSize(2), GFX_TL);
+
+    int bodyY = cardY + pad + 24;
+    tft.setTextColor(COLOR_TEXT_SECONDARY, COLOR_BUTTON_BG);
+    gfxDrawString(tft, "Tinggal 10%. Colok USB ke D32", cardX + pad, bodyY, 1, GFX_TL);
+    gfxDrawString(tft, "untuk mengisi daya.", cardX + pad, bodyY + 12, 1, GFX_TL);
+
+    tft.setTextColor(COLOR_ACCENT, COLOR_BUTTON_BG);
+    gfxDrawString(tft, "OK", cardX + cardW - pad, bodyY + 30, fontToSize(2), GFX_TR);
+}
+
+// SD-error toast (L_Overlays.dc.html): light-background/dark-text banner near
+// the bottom, inverted from the normal dark theme -- no light/white token
+// exists, so COLOR_TEXT_PRIMARY as the fill + COLOR_BG as the text is the
+// closest inversion from existing tokens. No dismiss affordance: nav.cpp
+// clears sdErrorOverlayActive on its own once the SD card reads again.
+void drawSDErrorToast() {
+    int toastH = 32, toastX = 12, toastW = SCREEN_W - 24;
+    int toastY = SCREEN_H - 14 - toastH;
+    tft.fillRoundRect(toastX, toastY, toastW, toastH, 8, COLOR_TEXT_PRIMARY);
+    tft.setTextColor(COLOR_BG, COLOR_TEXT_PRIMARY);
+    String msg = truncateToWidth(tft, "SD card tidak terbaca. Cek kartu dan kabel.", toastW - 28, 1);
+    gfxDrawString(tft, msg, toastX + 14, toastY + (toastH - 8) / 2, 1, GFX_TL);
+}
+
 void drawCurrentStateUI() {
     last_drawn_progress_pct = -1;
     switch (currentState) {
@@ -867,4 +913,6 @@ void drawCurrentStateUI() {
         case STATE_BT_RECEIVER: drawBTReceiverScreen(); break;
         case STATE_TRANSFER_FILE: drawTransferFileScreen(); break;
     }
+    if (lowBatteryOverlayActive) drawLowBatteryOverlay();
+    if (sdErrorOverlayActive) drawSDErrorToast();
 }

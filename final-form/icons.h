@@ -21,6 +21,7 @@ void maskCoverCorners(int x, int y, int w, int h, int radius);
 void drawPlaylistIcon(int cx, int cy, int size, uint16_t color);   // main-menu "Playlists" cell
 void drawSwapIcon(int cx, int cy, int size, uint16_t color);       // main-menu "Mode-switch" cell
 void drawBatteryIcon(int x, int y, int w, int h, uint8_t pct);     // header battery glyph (fixed theme colors)
+void drawLowBatteryIcon(int x, int y, int w, int h, uint16_t color);  // critical-charge glyph (low-battery dialog): outline + single low-level bar + nub, caller-supplied color
 void drawSpeakerIcon(int cx, int cy, int size, bool muted);        // volume overlay (fixed theme colors)
 
 // Visual-fidelity pass vs. dap-ui-design/source/*.dc.html -- exact glyphs transcribed

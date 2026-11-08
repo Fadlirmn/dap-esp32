@@ -129,6 +129,19 @@ void drawBatteryIcon(int x, int y, int w, int h, uint8_t pct) {
     if (fillW > 0) tft.fillRect(x + 2, y + 2, fillW, h - 4, COLOR_SUCCESS);
 }
 
+// Low-battery dialog glyph (L_Overlays.dc.html): outline body + a single thin
+// bar at the far left (not a pct fill like drawBatteryIcon -- this one always
+// reads as "nearly empty", matching the mockup's literal SVG: `rect x=.5 y=.5
+// w=18 h=11 rx=2` outline, `rect x=2 y=2 w=2 h=8 rx=1` bar, `rect x=19.5 y=3.5
+// w=2 h=5 rx=1` nub, all stroked/filled in the caller's color (COLOR_ERROR)).
+// x/y/w/h is the outline body's box; the nub extends past x+w like the mockup.
+void drawLowBatteryIcon(int x, int y, int w, int h, uint16_t color) {
+    tft.drawRoundRect(x, y, w, h, 2, color);
+    tft.fillRoundRect(x + 2, y + 2, 2, h - 4, 1, color);
+    int nubH = h / 2 + 1;
+    tft.fillRoundRect(x + w, y + (h - nubH) / 2, 2, nubH, 1, color);
+}
+
 // Volume-overlay speaker glyph: body+horn fixed COLOR_TEXT_SECONDARY; a single
 // outward sound-wave arc (approximated with 2 line segments -- Adafruit_GFX
 // has no arc primitive) when unmuted, a COLOR_ERROR cross when muted.

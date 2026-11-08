@@ -14,4 +14,8 @@ public:
     void set_stream_reader(void (*)(const uint8_t *, uint32_t), bool = true) {}
     void start(const char *) {}
     const char *get_peer_name() { return "Sim Phone"; }
+    void play() {}
+    void pause() {}
+    void next() {}
+    void previous() {}
 };

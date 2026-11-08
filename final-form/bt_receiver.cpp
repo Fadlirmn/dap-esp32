@@ -64,3 +64,26 @@ void btReceiverSetup() {
 void btReceiverSetVolume(uint8_t volume0to127) {
     i2sOutputSetVolume(volume0to127);
 }
+
+// AVRCP passthrough: tell the connected phone to play/pause/skip, the same
+// way a BT headset's buttons control the phone. BluetoothA2DPSink::play()/
+// pause()/next()/previous() already send the PRESSED+RELEASED passthrough
+// pair internally (see execute_avrc_command() in the library).
+void btReceiverPlayPause() {
+    if (!btrx_connected) return;
+    if (btrx_playing) {
+        a2dp_sink.pause();
+    } else {
+        a2dp_sink.play();
+    }
+}
+
+void btReceiverNext() {
+    if (!btrx_connected) return;
+    a2dp_sink.next();
+}
+
+void btReceiverPrev() {
+    if (!btrx_connected) return;
+    a2dp_sink.previous();
+}

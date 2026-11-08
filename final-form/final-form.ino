@@ -128,6 +128,8 @@ void loop() {
 #endif
     checkScreenTimeout();
     checkVolumeOverlayTimeout();
+    checkLowBattery();
+    checkSDHealth();
 
     if (operatingMode == MODE_TRANSFER_FILE) wifiTransferPoll();
 

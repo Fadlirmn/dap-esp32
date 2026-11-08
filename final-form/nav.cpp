@@ -6,6 +6,7 @@
 //   MENU = back, reproducing the original's exact per-screen back targets.
 #include "nav.h"
 #include <Preferences.h>
+#include <SD.h>
 #include "screens.h"
 #include "theme.h"
 #include "layout.h"
@@ -27,6 +28,36 @@ static unsigned long lastActivityAt = 0;
 
 OperatingMode operatingMode = MODE_LOCAL_PLAYER;
 unsigned long lastVolumeChangeAt = 0;
+OperatingMode switchingToMode = MODE_LOCAL_PLAYER;
+
+volatile bool lowBatteryOverlayActive = false;
+volatile bool sdErrorOverlayActive = false;
+
+// Honest about not having a real sensor: DUMMY_BATTERY_PCT (layout.h) is a
+// fixed constant, so this either always or never fires depending on that
+// constant's value -- it never fabricates a reading. Once real battery
+// sensing exists, swap DUMMY_BATTERY_PCT for the real read here.
+void checkLowBattery() {
+    if (!lowBatteryOverlayActive && DUMMY_BATTERY_PCT < LOW_BATTERY_THRESHOLD_PCT) {
+        lowBatteryOverlayActive = true;
+        if (!screenLocked) drawCurrentStateUI();
+    }
+}
+
+// Cheap periodic liveness probe -- SD.exists() on a path that should always
+// be there if the card is still readable. Throttled to every 3s, not every
+// tick, since SPI transactions aren't free.
+void checkSDHealth() {
+    static unsigned long lastCheckAt = 0;
+    unsigned long now = millis();
+    if (now - lastCheckAt < 3000) return;
+    lastCheckAt = now;
+
+    bool shouldShow = !SD.exists("/tracks");
+    if (shouldShow == sdErrorOverlayActive) return;  // no change
+    sdErrorOverlayActive = shouldShow;
+    if (!screenLocked) drawCurrentStateUI();
+}
 
 // Must run before audioDecoderSetup()/btSetup()/i2sOutputSetup()/etc. so
 // final-form.ino's setup() knows which subsystems to bring up.
@@ -52,6 +83,7 @@ void selectOperatingMode(OperatingMode m) {
     preferences.begin("mode_pref", false);
     preferences.putUChar("mode", (uint8_t)m);
     preferences.end();
+    switchingToMode = m;
     currentState = STATE_MODE_SWITCHING;
     drawCurrentStateUI();
     delay(600);
@@ -251,6 +283,8 @@ static void handleSelect() {
 
 void handleEncoderClick() {
     if (consumeWakeOrNoteActivity()) return;
+    if (lowBatteryOverlayActive) { lowBatteryOverlayActive = false; drawCurrentStateUI(); return; }
+    if (currentState == STATE_BT_RECEIVER) { btReceiverPlayPause(); return; }
     if (currentState == STATE_PLAYER) {
         bool wasPlaying = is_playing;
         if (wasPlaying) {
@@ -328,6 +362,7 @@ static void moveListFocus(bool onlyLikes, int dir) {
 void handlePrevButton() {
     if (consumeWakeOrNoteActivity()) return;
     if (currentState == STATE_PLAYER) { switchTrack(-1); return; }
+    if (currentState == STATE_BT_RECEIVER) { btReceiverPrev(); return; }
     switch (currentState) {
         case STATE_MENU: moveFocus(-1, menuGridCount()); break;
         case STATE_TRACK_LIST: moveListFocus(false, -1); break;
@@ -348,6 +383,7 @@ void handlePrevButton() {
 void handleNextButton() {
     if (consumeWakeOrNoteActivity()) return;
     if (currentState == STATE_PLAYER) { switchTrack(1); return; }
+    if (currentState == STATE_BT_RECEIVER) { btReceiverNext(); return; }
     switch (currentState) {
         case STATE_MENU: moveFocus(1, menuGridCount()); break;
         case STATE_TRACK_LIST: moveListFocus(false, 1); break;

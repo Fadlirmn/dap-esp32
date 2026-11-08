@@ -168,6 +168,8 @@ int main() {
 
         checkScreenTimeout();
         checkVolumeOverlayTimeout();
+        checkLowBattery();
+        checkSDHealth();
         checkBluetoothScanTimeout();
         if (operatingMode == MODE_TRANSFER_FILE) wifiTransferPoll();
         if (bt_state_changed) {

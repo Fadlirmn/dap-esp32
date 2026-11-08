@@ -36,3 +36,9 @@ void updateVolumeUI();
 // Floating auto-hiding volume overlay (nav.h's lastVolumeChangeAt/
 // checkVolumeOverlayTimeout): draw it over whatever screen is current.
 void drawVolumeOverlay();
+
+// Low-battery dialog + SD-error toast (nav.h's lowBatteryOverlayActive/
+// sdErrorOverlayActive): drawCurrentStateUI() paints whichever is active
+// over the current screen, every redraw, until dismissed/resolved.
+void drawLowBatteryOverlay();
+void drawSDErrorToast();

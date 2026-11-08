@@ -38,6 +38,21 @@ void loadOperatingMode();                 // call first in setup(), before any s
 UIState homeStateForMode();                // STATE_MENU, or the active mode's own dedicated screen
 void enterModeSelect();                   // MENU long-press, from anywhere: open STATE_MODE_SELECT
 void selectOperatingMode(OperatingMode m);  // confirm: persists pref, shows STATE_MODE_SWITCHING, ESP.restart()
+extern OperatingMode switchingToMode;       // set by selectOperatingMode() just before STATE_MODE_SWITCHING draws, so screens.cpp knows which mode it's switching to
+
+// Low-battery dialog + SD-error toast (dap-ui-landscape's L_Overlays screen).
+// Both paint on top of whatever screen is current, same architecture as the
+// volume overlay -- drawCurrentStateUI() (screens.cpp) draws them after the
+// normal per-state dispatch, every redraw, as long as the flag is set.
+// No real battery sensor exists (DUMMY_BATTERY_PCT in layout.h is a fixed
+// constant, see pins.h), so checkLowBattery() is honest about being a no-op
+// until real sensing exists: it only ever fires if that constant itself is
+// below the threshold, never from a fabricated "reading".
+constexpr uint8_t LOW_BATTERY_THRESHOLD_PCT = 15;
+extern volatile bool lowBatteryOverlayActive;
+extern volatile bool sdErrorOverlayActive;
+void checkLowBattery();  // call every loop() tick
+void checkSDHealth();    // call every loop() tick (throttled internally): periodic cheap SD.exists() probe
 
 // Floating auto-hiding volume overlay: any screen can show it over itself
 // while the encoder is being turned; checkVolumeOverlayTimeout() (called every
