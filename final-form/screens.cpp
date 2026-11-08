@@ -71,31 +71,6 @@ void drawCoverArt(int x, int y, int w, int h) {
     maskCoverCorners(x, y, w, h, 12);
 }
 
-// Smartwatch-style icon grid: 6 circular buttons (2x3), icon only, no labels
-// and no "now playing" panel (track info lives in the Player screen instead).
-// Not in dap-ui-design's screen list -- left as the existing grid, just wired
-// into the new header/footer.
-void drawMainMenu() {
-    tft.fillScreen(COLOR_BG);
-    drawHeader("STREAM 32");
-    for (int i = 0; i < 6; i++) {
-        int cx = MENU_CELL_CX[i % 3];
-        int cy = MENU_CELL_CY[i / 3];
-        tft.fillCircle(cx, cy, MENU_CELL_R, COLOR_PANEL);
-        tft.drawCircle(cx, cy, MENU_CELL_R, COLOR_PANEL_BORDER);
-        switch (i) {
-            case 0: drawPlayIcon(cx, cy, 18, COLOR_ACCENT); break;
-            case 1: drawLibraryIcon(cx, cy, 14, COLOR_ACCENT); break;
-            case 2: drawPlaylistIcon(cx, cy, 14, COLOR_ACCENT); break;
-            case 3: drawHeartIcon(cx, cy, 15, COLOR_ACCENT); break;
-            case 4: drawGearIcon(cx, cy, 14, COLOR_ACCENT); break;
-            case 5: drawSwapIcon(cx, cy, 14, COLOR_ACCENT); break;
-        }
-        if (focusIndex == i) drawFocusRingCircle(cx, cy, MENU_CELL_R + 2);
-    }
-    drawFooter("Klik: pilih - MENU: menu");
-}
-
 // Settings list: plain rows, COLOR_CHIP_BG pill only on the focused row
 // (dap-ui-design pattern) instead of a bordered card on every row. Row
 // geometry (34 + i*30, h26) is unchanged -- nav.cpp's touch handler hardcodes
@@ -452,9 +427,9 @@ void drawTrackListScreen(bool onlyLikes) {
 // buttons sit at y=166/202 h=30 (bottom 232), and nav.cpp's touch handler
 // hardcodes those exact pixel rects. The new 28px footer band (y212-240)
 // would visually clip the SCAN button, and nav.cpp is off-limits to move it.
-// This screen isn't in dap-ui-design's explicit screen list either (BT
-// Transmitter mode now lives in drawPlayerScreen/drawMainMenu) -- header
-// wiring fixed, footer skipped, reported as a deviation.
+// This screen isn't in dap-ui-landscape's explicit screen list either (BT
+// Transmitter mode now lives in drawPlayerScreen) -- header wiring fixed,
+// footer skipped, reported as a deviation.
 void drawBTManagerScreen() {
     tft.fillScreen(COLOR_BG);
     drawHeader("BLUETOOTH", HICON_BT);
@@ -617,52 +592,55 @@ void drawPlaylistDetailScreen() {
     drawFooter("Klik putar - MENU kembali");
 }
 
-// Mode Select / "Menu" (L_Menu.dc.html): a 2-column x 4-row grid of 7 cells
-// -- Daftar Lagu, Playlist, Local Player, BT Receiver, BT Transmitter,
-// Transfer File, Kembali -- NOT the old vertical list. No header MENU chip
-// here (you're already in the menu). Icon circle shrunk to 28x28 (was 32),
-// no subtitles (the mockup's compact 40px-tall cells have no room for one),
-// "AKTIF" trailing label on whichever mode cell matches operatingMode.
-// Cells 0/1 (Daftar Lagu/Playlist) are plain navigation shortcuts; cells 2-5
-// are the 4 operating modes; cell 6 (Kembali) goes home -- see nav.cpp's
-// handleSelect() STATE_MODE_SELECT case for the matching focusIndex mapping.
+// Mode Select / "Menu" (L_Menu.dc.html, widened to 3 columns): a 3x3 grid of
+// 9 cells -- Daftar Lagu, Playlist, Likes, Local Player, BT Receiver,
+// BT Transmitter, Transfer File, Settings, Kembali. This is the ONLY home
+// menu now (see nav.h/layout.h comments: the old separate STATE_MENU
+// icon-grid screen, which had no mockup counterpart at all, is gone -- Local
+// Player/BT Transmitter boot straight into Now Playing, and Likes/Settings
+// moved in here rather than keeping a whole screen alive for two entries).
+// No header MENU chip here (you're already in the menu). Icon circles
+// shrunk further to fit 3 narrower columns; no subtitles; "AKTIF" trailing
+// label on whichever mode cell matches operatingMode. Cell order: 0 Daftar
+// Lagu, 1 Playlist, 2 Likes, 3-6 the 4 operating modes, 7 Settings,
+// 8 Kembali -- see nav.cpp's handleSelect() STATE_MODE_SELECT case.
 void drawModeSelectScreen() {
     tft.fillScreen(COLOR_BG);
     drawHeader("MENU", HICON_NONE, false);
-    const char *labels[] = {"Daftar Lagu", "Playlist", "Local Player", "BT Receiver", "BT Transmitter", "Transfer File", "Kembali"};
+    const char *labels[] = {"Daftar Lagu", "Playlist", "Favorit", "Local Player", "BT Receiver", "BT Transmitter", "Transfer File", "Pengaturan", "Kembali"};
 
     for (uint8_t i = 0; i < MODE_GRID_COUNT; i++) {
-        int col = i % 2, row = i / 2;
-        int x = (col == 0) ? MODE_GRID_X0 : MODE_GRID_X1;
+        int col = i % 3, row = i / 3;
+        int x = col == 0 ? MODE_GRID_X0 : (col == 1 ? MODE_GRID_X1 : MODE_GRID_X2);
         int y = MODE_GRID_Y_START + row * (MODE_GRID_ROW_H + MODE_GRID_ROW_GAP);
         bool focused = (focusIndex == i);
         uint16_t bg = focused ? COLOR_CHIP_BG : COLOR_PANEL;
         tft.fillRoundRect(x, y, MODE_GRID_COL_W, MODE_GRID_ROW_H, 12, bg);
 
-        int iconCx = x + 10 + 14, iconCy = y + MODE_GRID_ROW_H / 2;
-        tft.fillCircle(iconCx, iconCy, 14, COLOR_BUTTON_BG);
+        int iconCx = x + 8 + 12, iconCy = y + MODE_GRID_ROW_H / 2;
+        tft.fillCircle(iconCx, iconCy, 12, COLOR_BUTTON_BG);
         switch (i) {
-            case 0: drawListIcon(iconCx, iconCy, 8, COLOR_ACCENT); break;
-            case 1: drawPlaylistIcon(iconCx, iconCy, 8, COLOR_ACCENT); break;
-            case 2: drawMusicNoteGlyph(iconCx, iconCy, 8, COLOR_ACCENT); break;
-            case 3: drawBluetoothZigzag(iconCx, iconCy, 8, COLOR_ACCENT); break;
-            case 4: drawBluetoothZigzag(iconCx, iconCy, 8, COLOR_ACCENT); break;
-            case 5: drawUploadIcon(iconCx, iconCy, 8, COLOR_ACCENT); break;
-            case 6: drawBackIcon(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 0: drawListIcon(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 1: drawPlaylistIcon(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 2: drawHeartIcon(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 3: drawMusicNoteGlyph(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 4: drawBluetoothZigzag(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 5: drawBluetoothZigzag(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 6: drawUploadIcon(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 7: drawGearIcon(iconCx, iconCy, 7, COLOR_ACCENT); break;
+            case 8: drawBackIcon(iconCx, iconCy, 6, COLOR_ACCENT); break;
         }
 
-        bool isActiveMode = (i >= 2 && i <= 5) && ((OperatingMode)(i - 2) == operatingMode);
-        int textX = x + 10 + 28 + 8;
-        int textRight = x + MODE_GRID_COL_W - 8;
+        bool isActiveMode = (i >= 3 && i <= 6) && ((OperatingMode)(i - 3) == operatingMode);
+        int textX = x + 8 + 24 + 6;
+        int textRight = x + MODE_GRID_COL_W - 6;
+        tft.setTextColor(COLOR_TEXT_PRIMARY, bg);
+        String label = truncateToWidth(tft, labels[i], textRight - textX, 1);
+        gfxDrawString(tft, label, textX, y + 6, fontToSize(1), GFX_TL);
         if (isActiveMode) {
             tft.setTextColor(COLOR_SUCCESS, bg);
-            int aktifW = gfxTextWidth(tft, "AKTIF", 1);
-            gfxDrawString(tft, "AKTIF", textRight - aktifW, y + MODE_GRID_ROW_H / 2 - 3, 1, GFX_TL);
-            textRight -= aktifW + 6;
+            gfxDrawString(tft, "AKTIF", textX, y + MODE_GRID_ROW_H - 14, 1, GFX_TL);
         }
-        tft.setTextColor(COLOR_TEXT_PRIMARY, bg);
-        String label = truncateToWidth(tft, labels[i], textRight - textX, 2);
-        gfxDrawString(tft, label, textX, y + MODE_GRID_ROW_H / 2 - 4, fontToSize(2), GFX_TL);
     }
     drawFooter("Klik: OK - MENU: kembali");
 }
@@ -710,8 +688,9 @@ void drawModeSwitchingScreen() {
     gfxDrawString(tft, line2, textX, barY + 28, 1, GFX_TL);
 }
 
-// "Home" screen for MODE_BT_RECEIVER (no STATE_MENU grid in this mode, so the
-// mode-switch hint doubles as the only way back to Settings/mode-select).
+// "Home" screen for MODE_BT_RECEIVER (same as every mode: no separate
+// icon-grid menu, just the MENU long-press into STATE_MODE_SELECT for
+// Settings/mode-switching).
 // Per L_Receiver.dc.html: taller panel (130, not 106) with a single centered
 // bluetooth icon -- no album art, phone audio has no local file to read art
 // for -- connection badge top-right, and title/subtitle in a scrim band
@@ -752,7 +731,7 @@ static void drawTFCard(int x, int y, int w, int h) {
     tft.fillRoundRect(x, y, w, h, TF_CARD_RADIUS, COLOR_PANEL);
 }
 
-// "Home" screen for MODE_TRANSFER_FILE (no STATE_MENU grid in this mode).
+// "Home" screen for MODE_TRANSFER_FILE.
 // Per L_Transfer.dc.html: two-column layout -- left column is a hotspot-info
 // card + a browser-URL card; right column is an upload-progress card plus a
 // status chip below it.
@@ -894,7 +873,6 @@ void drawSDErrorToast() {
 void drawCurrentStateUI() {
     last_drawn_progress_pct = -1;
     switch (currentState) {
-        case STATE_MENU: drawMainMenu(); break;
         case STATE_PLAYER: drawPlayerScreen(); break;
         case STATE_TRACK_LIST: drawTrackListScreen(false); break;
         case STATE_LIKES_LIST: drawTrackListScreen(true); break;

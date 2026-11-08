@@ -13,28 +13,26 @@ constexpr int SCREEN_H = 240;
 constexpr int HEADER_H = 26;
 constexpr int FOOTER_H = 28;  // footer keeps its 28px default, no override anywhere
 
-// Main menu (STATE_MENU): smartwatch-style 2x3 icon grid, home screen for
-// MODE_LOCAL_PLAYER/MODE_BT_TRANSMITTER. No L_*.dc.html counterpart in this
-// landscape set either (same as the portrait set) -- left untouched.
-constexpr int MENU_CELL_CX[3] = {54, 160, 266};
-constexpr int MENU_CELL_CY[2] = {88, 178};
-constexpr int MENU_CELL_R = 34;
-
 // Dummy battery %: no ADC pin wired for real battery sensing (pins.h has
 // none), so the header just shows this constant.
 constexpr uint8_t DUMMY_BATTERY_PCT = 78;
 
-// Mode Select (STATE_MODE_SELECT / L_Menu.dc.html): a 2-column x 4-row grid
-// of 7 cells (Daftar Lagu, Playlist, Local Player, BT Receiver,
-// BT Transmitter, Transfer File, Kembali) -- NOT the old vertical list.
-// grid padding 8px top / 10px sides, 6px row+col gap, 40px cell height;
-// row3 (just "Kembali") lands its bottom exactly on the footer top (212).
-constexpr int MODE_GRID_X0 = 10, MODE_GRID_X1 = 163;
-constexpr int MODE_GRID_COL_W = 147;
+// Mode Select (STATE_MODE_SELECT / L_Menu.dc.html): a 3-column x 3-row grid
+// of 9 cells -- Daftar Lagu, Playlist, Likes, Local Player, BT Receiver,
+// BT Transmitter, Transfer File, Settings, Kembali. This is also the ONLY
+// way into Settings/Likes now: the old separate STATE_MENU icon-grid home
+// screen (no L_*.dc.html counterpart at all, since the mockup's "home" for
+// Local Player/BT Transmitter is just Now Playing directly) is gone, and
+// this grid already covered Daftar Lagu/Playlist/mode-switching, so Likes
+// and Settings join it rather than getting a dead screen kept alive just
+// for two entries. 3 columns (not the mockup's literal 2) to fit all 9
+// cells in 3 rows instead of 5 -- 5 rows would overflow past the footer.
+constexpr int MODE_GRID_X0 = 8, MODE_GRID_X1 = 111, MODE_GRID_X2 = 214;
+constexpr int MODE_GRID_COL_W = 98;
 constexpr int MODE_GRID_Y_START = 34;
 constexpr int MODE_GRID_ROW_H = 40;
 constexpr int MODE_GRID_ROW_GAP = 6;
-constexpr int MODE_GRID_COUNT = 7;
+constexpr int MODE_GRID_COUNT = 9;
 
 // Floating auto-hiding volume overlay (L_Volume/L_VolumeList.dc.html): pill
 // at left14/right14/top34/height44, same spot regardless of which screen

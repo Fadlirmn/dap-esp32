@@ -18,7 +18,7 @@
 
 extern Preferences preferences;
 
-UIState currentState = STATE_MENU;
+UIState currentState = STATE_PLAYER;
 int focusIndex = 0;
 int trackList_currentPage = 0;
 int likesList_currentPage = 0;
@@ -70,7 +70,7 @@ void loadOperatingMode() {
 
 void enterModeSelect() {
     currentState = STATE_MODE_SELECT;
-    focusIndex = (int)operatingMode + 2;  // cells 0/1 are Daftar Lagu/Playlist, modes start at cell 2
+    focusIndex = (int)operatingMode + 3;  // cells 0-2 are Daftar Lagu/Playlist/Likes, modes start at cell 3
     drawCurrentStateUI();
 }
 
@@ -79,7 +79,7 @@ void enterModeSelect() {
 // File each own the radio/I2S/WiFi hardware exclusively), so switching is a
 // full restart rather than a live subsystem swap.
 void selectOperatingMode(OperatingMode m) {
-    if (m == operatingMode) { enterState(STATE_MENU); return; }
+    if (m == operatingMode) { enterState(homeStateForMode()); return; }
     preferences.begin("mode_pref", false);
     preferences.putUChar("mode", (uint8_t)m);
     preferences.end();
@@ -130,12 +130,11 @@ static int themeListCount() { return 5; }
 static int resetConfirmCount() { return 2; }
 static int btManagerCount() { return 2; }
 static int screenTimeoutCount() { return 4; }
-static int menuGridCount() { return 6; }  // Player/Tracks/Playlists/Likes/Settings/Mode-switch
-// L_Menu.dc.html's 2-column grid: Daftar Lagu/Playlist/Local Player/BT
-// Receiver/BT Transmitter/Transfer File/Kembali. Row-major flat index 0..6 --
-// PREV/NEXT just walk this flat index by +-1 (moveFocus below), same as
-// STATE_MENU's own 2x3 grid above: that's the "2D grid" math this hardware
-// needs, since there's no separate left/right input, only PREV/NEXT.
+// L_Menu.dc.html's grid (widened to 3 columns here, see layout.h): Daftar
+// Lagu/Playlist/Likes/the 4 modes/Settings/Kembali. Row-major flat index
+// 0..8 -- PREV/NEXT just walk this flat index by +-1 (moveFocus below),
+// same "2D grid as a flat list" trick used elsewhere, since there's no
+// separate left/right input, only PREV/NEXT.
 static int modeSelectCount() { return MODE_GRID_COUNT; }
 static int playlistsCount() { return totalPlaylists; }
 
@@ -144,14 +143,17 @@ static int playlistsCount() { return totalPlaylists; }
 // paging like the track list if playlists ever need to exceed one screen.
 int playlist_selectedIndex = 0;
 
-// STATE_MENU, STATE_BT_RECEIVER and STATE_TRANSFER_FILE are each only valid
-// for specific modes; "home" is whichever one boots for the active mode, and
-// is also where cancelling out of the mode-select screen lands.
+// STATE_BT_RECEIVER and STATE_TRANSFER_FILE are each only valid for their
+// own mode; "home" is whichever one boots for the active mode, and is also
+// where cancelling out of the mode-select screen lands. Local Player/BT
+// Transmitter have no separate menu screen -- Now Playing (STATE_PLAYER) is
+// home directly, matching dap-ui-landscape (which has no such screen
+// either); Settings/Likes/Tracks/Playlists all live in STATE_MODE_SELECT.
 UIState homeStateForMode() {
     switch (operatingMode) {
         case MODE_BT_RECEIVER: return STATE_BT_RECEIVER;
         case MODE_TRANSFER_FILE: return STATE_TRANSFER_FILE;
-        default: return STATE_MENU;  // MODE_LOCAL_PLAYER, MODE_BT_TRANSMITTER
+        default: return STATE_PLAYER;  // MODE_LOCAL_PLAYER, MODE_BT_TRANSMITTER
     }
 }
 
@@ -196,16 +198,6 @@ static void doReset() {
 
 static void handleSelect() {
     switch (currentState) {
-        case STATE_MENU:
-            switch (focusIndex) {
-                case 0: enterState(STATE_PLAYER); break;
-                case 1: trackList_currentPage = 0; enterState(STATE_TRACK_LIST); break;
-                case 2: enterState(STATE_PLAYLISTS); break;
-                case 3: likesList_currentPage = 0; enterState(STATE_LIKES_LIST); break;
-                case 4: enterState(STATE_SETTINGS); break;
-                case 5: enterModeSelect(); break;
-            }
-            break;
         case STATE_TRACK_LIST: selectTrackListItem(false); break;
         case STATE_LIKES_LIST: selectTrackListItem(true); break;
         case STATE_PLAYLISTS:
@@ -218,13 +210,16 @@ static void handleSelect() {
             if (playPlaylistTrack(playlist_selectedIndex, focusIndex)) enterState(STATE_PLAYER);
             break;
         case STATE_MODE_SELECT:
-            // Cell order: 0 Daftar Lagu, 1 Playlist, 2-5 the 4 operating
-            // modes, 6 Kembali (see drawModeSelectScreen's `labels`).
+            // Cell order: 0 Daftar Lagu, 1 Playlist, 2 Likes, 3-6 the 4
+            // operating modes, 7 Settings, 8 Kembali (see
+            // drawModeSelectScreen's `labels`).
             switch (focusIndex) {
                 case 0: trackList_currentPage = 0; enterState(STATE_TRACK_LIST); break;
                 case 1: enterState(STATE_PLAYLISTS); break;
-                case 6: enterState(homeStateForMode()); break;
-                default: selectOperatingMode((OperatingMode)(focusIndex - 2)); break;
+                case 2: likesList_currentPage = 0; enterState(STATE_LIKES_LIST); break;
+                case 7: enterState(STATE_SETTINGS); break;
+                case 8: enterState(homeStateForMode()); break;
+                default: selectOperatingMode((OperatingMode)(focusIndex - 3)); break;
             }
             break;
         case STATE_SETTINGS:
@@ -364,7 +359,6 @@ void handlePrevButton() {
     if (currentState == STATE_PLAYER) { switchTrack(-1); return; }
     if (currentState == STATE_BT_RECEIVER) { btReceiverPrev(); return; }
     switch (currentState) {
-        case STATE_MENU: moveFocus(-1, menuGridCount()); break;
         case STATE_TRACK_LIST: moveListFocus(false, -1); break;
         case STATE_LIKES_LIST: moveListFocus(true, -1); break;
         case STATE_SETTINGS: moveFocus(-1, settingsListCount()); break;
@@ -385,7 +379,6 @@ void handleNextButton() {
     if (currentState == STATE_PLAYER) { switchTrack(1); return; }
     if (currentState == STATE_BT_RECEIVER) { btReceiverNext(); return; }
     switch (currentState) {
-        case STATE_MENU: moveFocus(1, menuGridCount()); break;
         case STATE_TRACK_LIST: moveListFocus(false, 1); break;
         case STATE_LIKES_LIST: moveListFocus(true, 1); break;
         case STATE_SETTINGS: moveFocus(1, settingsListCount()); break;
@@ -430,8 +423,7 @@ void handleMenuButton() {
     }
 }
 
-// Long press (wired in input.cpp): open the mode switcher from anywhere,
-// including the two dedicated-screen modes that have no STATE_MENU grid.
+// Long press (wired in input.cpp): open the mode switcher from anywhere.
 void handleMenuLongPress() {
     if (consumeWakeOrNoteActivity()) return;
     if (currentState == STATE_MODE_SWITCHING) return;  // mid-restart, ignore
@@ -465,17 +457,6 @@ void processGlobalTouch(int x, int y) {
     }
 
     switch (currentState) {
-        case STATE_MENU: {
-            for (int i = 0; i < 6; i++) {
-                if (pointInCircle(x, y, MENU_CELL_CX[i % 3], MENU_CELL_CY[i / 3], MENU_CELL_R)) {
-                    focusIndex = i;
-                    handleSelect();
-                    break;
-                }
-            }
-            break;
-        }
-
         case STATE_PLAYER: {
             if (pointInCircle(x, y, PL_PREV_CX, PL_BTN_CY, PL_BTN_R)) {
                 switchTrack(-1);

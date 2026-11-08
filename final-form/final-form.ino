@@ -68,9 +68,9 @@ void setup() {
     loadPlaylistIndex();
 
     // Local Player / BT Transmitter both play from the SD library through the
-    // same STATE_MENU/STATE_PLAYER UI -- resume state, likes and the decoder
-    // task only matter for those two. BT Receiver plays whatever the phone
-    // streams; Transfer File plays nothing.
+    // same STATE_PLAYER UI -- resume state, likes and the decoder task only
+    // matter for those two. BT Receiver plays whatever the phone streams;
+    // Transfer File plays nothing.
     bool playsLocalLibrary = (operatingMode == MODE_LOCAL_PLAYER || operatingMode == MODE_BT_TRANSMITTER);
     if (playsLocalLibrary && total_tracks > 0) {
         loadLikes();

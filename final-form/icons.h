@@ -13,7 +13,6 @@ void drawHeartIcon(int cx, int cy, int r, uint16_t color);
 void drawVectorMusicNote(int x, int y, int w, int h, uint16_t color);
 void drawBluetoothLogo(int cx, int cy, int size, uint16_t color);
 void drawBackIcon(int cx, int cy, int size, uint16_t color);
-void drawLibraryIcon(int cx, int cy, int size, uint16_t color);
 void drawGearIcon(int cx, int cy, int size, uint16_t color);
 void maskCoverCorners(int x, int y, int w, int h, int radius);
 
@@ -57,6 +56,5 @@ void drawFooter(const String &hint);
 // NEW: accent-colored outline marking the cursor-focused item (encoder/button nav
 // has no finger to tap, so every selectable item needs a visible "this one" marker).
 // Still used by screens not covered by the dap-ui-design list-row restyle pass
-// (Settings sub-screens, BT manager, theme list, reset confirm, main menu grid).
+// (Settings sub-screens, BT manager, theme list, reset confirm).
 void drawFocusRing(int x, int y, int w, int h);
-void drawFocusRingCircle(int cx, int cy, int r);

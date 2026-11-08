@@ -5,7 +5,6 @@
 #include "pins.h"  // ENABLE_TOUCH must be defined before the #if ENABLE_TOUCH guards below
 
 enum UIState {
-    STATE_MENU,
     STATE_PLAYER,
     STATE_TRACK_LIST,
     STATE_LIKES_LIST,
@@ -29,13 +28,16 @@ extern UIState currentState;
 // One mode is active per boot; switching modes saves the choice and restarts
 // (see selectOperatingMode()). BT_TRANSMITTER is today's whole existing app
 // (SD -> A2DP source -> headset) under its mockup name, so it reuses
-// STATE_MENU/STATE_PLAYER/etc. unchanged; LOCAL_PLAYER reuses the same UI but
-// outputs over the I2S DAC (audio_decoder.cpp) instead of A2DP.
+// STATE_PLAYER/etc. unchanged; LOCAL_PLAYER reuses the same UI but outputs
+// over the I2S DAC (audio_decoder.cpp) instead of A2DP. Both boot straight
+// into STATE_PLAYER (no separate icon-grid home screen -- see
+// homeStateForMode()); Settings/Likes/Tracks/Playlists are all reached via
+// STATE_MODE_SELECT's grid instead.
 enum OperatingMode : uint8_t { MODE_LOCAL_PLAYER, MODE_BT_RECEIVER, MODE_BT_TRANSMITTER, MODE_TRANSFER_FILE };
 extern OperatingMode operatingMode;  // set from Preferences("mode_pref") before setup() inits anything else
 
 void loadOperatingMode();                 // call first in setup(), before any subsystem init
-UIState homeStateForMode();                // STATE_MENU, or the active mode's own dedicated screen
+UIState homeStateForMode();                // STATE_PLAYER, or the active mode's own dedicated screen
 void enterModeSelect();                   // MENU long-press, from anywhere: open STATE_MODE_SELECT
 void selectOperatingMode(OperatingMode m);  // confirm: persists pref, shows STATE_MODE_SWITCHING, ESP.restart()
 extern OperatingMode switchingToMode;       // set by selectOperatingMode() just before STATE_MODE_SWITCHING draws, so screens.cpp knows which mode it's switching to

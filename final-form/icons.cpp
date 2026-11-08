@@ -70,17 +70,7 @@ void drawBackIcon(int cx, int cy, int size, uint16_t color) {
     tft.drawLine(cx - dx, cy, cx + dx, cy + size, color);
 }
 
-// "Tracks" glyph: 3 note-stems + dots, hoisted out of drawMainMenu's inline
-// code so the main-menu grid and any future screen can both use it.
-void drawLibraryIcon(int cx, int cy, int size, uint16_t color) {
-    for (int r = -1; r <= 1; r++) {
-        tft.drawFastHLine(cx - 2, cy + r * (size / 2), size + 3, color);
-        tft.fillCircle(cx - size, cy + r * (size / 2), 2, color);
-    }
-}
-
-// "Settings" glyph: gear (ring + 8 ticks), hoisted out of drawMainMenu's
-// inline code for the same reason as drawLibraryIcon above.
+// "Settings" glyph: gear (ring + 8 ticks).
 void drawGearIcon(int cx, int cy, int size, uint16_t color) {
     tft.drawCircle(cx, cy, size / 2, color);
     for (int tick = 0; tick < 8; tick++) {
@@ -91,8 +81,8 @@ void drawGearIcon(int cx, int cy, int size, uint16_t color) {
 }
 
 // "Playlists" glyph: stacked horizontal bars (a list of rows) with a small
-// play-triangle badge at bottom-right, distinguishing it from drawLibraryIcon's
-// note-stems-and-dots.
+// play-triangle badge at bottom-right, distinguishing it from drawListIcon's
+// plain bars (no badge).
 void drawPlaylistIcon(int cx, int cy, int size, uint16_t color) {
     int barLen = size * 2 - 4;
     tft.drawFastHLine(cx - size, cy - size + 2, barLen, color);
@@ -349,9 +339,4 @@ void drawFooter(const String &hint) {
 void drawFocusRing(int x, int y, int w, int h) {
     tft.drawRoundRect(x, y, w, h, 4, COLOR_ACCENT);
     tft.drawRoundRect(x - 1, y - 1, w + 2, h + 2, 5, COLOR_ACCENT);
-}
-
-void drawFocusRingCircle(int cx, int cy, int r) {
-    tft.drawCircle(cx, cy, r, COLOR_ACCENT);
-    tft.drawCircle(cx, cy, r + 1, COLOR_ACCENT);
 }

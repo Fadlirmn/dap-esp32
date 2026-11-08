@@ -4,7 +4,6 @@
 
 void drawCoverArt(int x, int y, int w, int h);
 
-void drawMainMenu();
 void drawSettingsScreen();
 void drawPlaybackSettingsScreen();
 void drawScreenSettingsScreen();
