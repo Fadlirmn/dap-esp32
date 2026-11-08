@@ -1,4 +1,9 @@
 old/files.zip
 final-form/sim/sim
 final-form/.pio/
+kode-optimasi/.pio/
+kode-optimasi/*.o
+kode-optimasi/sim/lvgl/
+kode-optimasi/sim/sim
+kode-optimasi/sim/*.o
 dap-ui-landscape.zip
