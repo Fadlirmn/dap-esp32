@@ -5,6 +5,12 @@
 #include "ui_icons.h"
 #include "ui_theme.h"
 #include "display_pins.h"
+#include "screen_manager.h"
+
+static void badge_clicked_cb(lv_event_t *e) {
+    LV_UNUSED(e);
+    screen_manager_show(SCREEN_BT_DEVICES_TX); // "ganti perangkat" -- back to the device list
+}
 
 // Real, persistent state (not purely decorative) -- no real local audio
 // source exists in this standalone module, but play/pause and prev/next
@@ -77,6 +83,8 @@ void screen_transmitter_create(lv_obj_t *parent) {
 
     lv_obj_t *badge = icon_connected_badge(card);
     lv_obj_set_pos(badge, card_w - 28, 6);
+    lv_obj_add_flag(badge, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(badge, badge_clicked_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(card, on_screen_deleted, LV_EVENT_DELETE, NULL);
 
     lv_obj_t *caption = lv_obj_create(card);

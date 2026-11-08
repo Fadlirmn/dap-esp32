@@ -9,6 +9,7 @@
 #include "screen_switch.h"
 #include "screen_playlists.h"
 #include "screen_playlist_detail.h"
+#include "screen_bt_devices.h"
 
 static lv_obj_t *s_root = NULL;   // one persistent screen, loaded exactly once
 static ScreenId s_current = SCREEN_COUNT; // invalid until first show
@@ -24,6 +25,8 @@ static void build_screen(lv_obj_t *root, ScreenId id) {
         case SCREEN_SWITCH:          screen_switch_create(root); break;
         case SCREEN_PLAYLISTS:       screen_playlists_create(root); break;
         case SCREEN_PLAYLIST_DETAIL: screen_playlist_detail_create(root); break;
+        case SCREEN_BT_DEVICES_RX:   screen_bt_devices_rx_create(root); break;
+        case SCREEN_BT_DEVICES_TX:   screen_bt_devices_tx_create(root); break;
         default:                     screen_now_playing_create(root); break;
     }
 }

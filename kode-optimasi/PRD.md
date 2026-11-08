@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Versi dokumen** | 1.3 |
+| **Versi dokumen** | 1.4 |
 | **Tanggal** | 2026-11-08 |
 | **Status** | Reverse-engineered dari kode berjalan (bukan draft rencana) |
-| **Lingkup kode yang didokumentasikan** | `/mnt/seagate/Koding/DAP-Esp32Devkit/kode-optimasi` — 36 file, ~1.550 baris |
-| **Riwayat revisi** | v1.0 (2026-11-08): draf awal. v1.1 (2026-11-08): + ID requirement & acceptance criteria per layar (§4), + diagram navigasi (§6), + metadata versi ini. v1.2 (2026-11-08): + detail lengkap efek transisi/perpindahan menu, efek hover/pressed, interaksi overlay-vs-transisi (§5.6–§5.9); ditemukan & dicatat gap baru: FR-L8 tidak reachable dari UI mana pun. v1.3 (2026-11-08): banyak elemen yang dulu dekoratif sekarang benar-benar nyata (play/pause, prev/next per-track duration, volume persisten + scroll wheel, pilih baris Daftar Lagu/Playlist, badge MENU jadi ikon home, efek tekan universal, jam berhenti saat pause); 2 bug visual nyata ditemukan & diperbaiki (karakter "·" tidak didukung font bawaan, elemen klik tanpa feedback visual sama sekali). |
+| **Lingkup kode yang didokumentasikan** | `/mnt/seagate/Koding/DAP-Esp32Devkit/kode-optimasi` — 38 file, ~1.700 baris |
+| **Riwayat revisi** | v1.0 (2026-11-08): draf awal. v1.1 (2026-11-08): + ID requirement & acceptance criteria per layar (§4), + diagram navigasi (§6), + metadata versi ini. v1.2 (2026-11-08): + detail lengkap efek transisi/perpindahan menu, efek hover/pressed, interaksi overlay-vs-transisi (§5.6–§5.9); ditemukan & dicatat gap baru: FR-L8 tidak reachable dari UI mana pun. v1.3 (2026-11-08): banyak elemen yang dulu dekoratif sekarang benar-benar nyata (play/pause, prev/next per-track duration, volume persisten + scroll wheel, pilih baris Daftar Lagu/Playlist, badge MENU jadi ikon home, efek tekan universal, jam berhenti saat pause); 2 bug visual nyata ditemukan & diperbaiki (karakter "·" tidak didukung font bawaan, elemen klik tanpa feedback visual sama sekali). v1.4 (2026-11-08): + layar baru **Pilih Perangkat** (`screen_bt_devices.cpp`, FR-NEW-1) di luar 12 board asli — Menu's tile BT Receiver/Transmitter sekarang lewat sini dulu, badge "Terhubung" bisa diklik balik untuk ganti perangkat; data dummy semua layar (termasuk ini) sudah dipisah agar hanya ada di build sim (`KODE_OPTIMASI_SIM`), dikonfirmasi lewat `strings` di ELF ESP32 nyata, bukan cuma baca kode. |
 
 > **Catatan**: Dokumen ini adalah PRD yang *di-reverse-engineer* dari source code yang sudah ada di `/mnt/seagate/Koding/DAP-Esp32Devkit/kode-optimasi`, bukan PRD untuk fitur yang belum dibuat. Setiap angka, warna, dan perilaku di sini diambil langsung dari kode (per baris dicek ulang saat menulis dokumen ini), bukan dari ingatan/asumsi percakapan.
 
@@ -124,10 +124,11 @@ Prinsip: **tidak ada bitmap/raster sama sekali**. Dua sumber ikon:
 
 ---
 
-## 4. Requirement Fungsional per Layar (12 board)
+## 4. Requirement Fungsional per Layar (12 board asli + 1 tambahan)
 
 | # | Board mockup | File | Jenis |
 |---|---|---|---|
+| *(baru)* | Pilih Perangkat (RX/TX) | `screen_bt_devices.*` | Layar penuh, dipakai 2x (lihat FR-NEW-1) — **di luar 12 board asli** |
 | L1 | Now Playing | `screen_now_playing.*` + `cassette_anim.*` | Layar penuh |
 | L2 | Daftar Lagu | `screen_library.*` | Layar penuh |
 | L3 | Menu mode | `screen_menu.*` | Layar penuh |
@@ -170,8 +171,16 @@ Legenda status verifikasi yang dipakai di tiap FR di bawah:
 - [x] Tiap tile: badge ikon 28×28 radius14 + label, semua **klik-fungsional** (🖱️, lihat §6 untuk peta tujuan).
 - [x] Footer: "Klik: OK · MENU: kembali".
 
+#### FR-NEW-1 — Pilih Perangkat (RX/TX)
+**File**: `screen_bt_devices.cpp` | **Status**: ✅ render, 🖱️ navigasi penuh | **Tidak ada di 12 board asli**
+- [x] Satu implementasi dipakai 2 kali (`ScreenId` `SCREEN_BT_DEVICES_RX`/`_TX`): header ikon BLUETOOTH + "Pilih Perangkat" + badge MENU + baterai.
+- [x] RX: daftar perangkat yang pernah terhubung (demo: "Pixel 7 - Fadli", "iPhone - Sarah", "Laptop Kerja"). TX: daftar speaker ditemukan (demo: "JBL Flip 6", "Sony SRS-XB13", "Speaker Mobil"). Kosong di build hardware (`KODE_OPTIMASI_SIM`), dengan empty-state ("Tidak ada perangkat yang pernah terhubung" / "Tidak ada speaker ditemukan").
+- [x] Klik baris (🖱️) → `SCREEN_RECEIVER`/`SCREEN_TRANSMITTER`. Badge "Terhubung" di layar tujuan (🖱️, ditambahkan di `screen_receiver.cpp`/`screen_transmitter.cpp`) → balik ke layar ini ("ganti perangkat") — round-trip nyata, diverifikasi via simulasi klik `lv_event_send` end-to-end tanpa crash.
+- [x] Footer: "Klik untuk hubungkan - MENU kembali" (atau "MENU: kembali" saat kosong).
+- [x] Menu's tile "BT Receiver"/"BT Transmitter" sekarang menuju ke sini dulu (bukan langsung ke FR-L4/FR-L5).
+
 #### FR-L4 — BT Receiver
-**File**: `screen_receiver.cpp` | **Status**: ✅ render, 🖱️ transport nyata
+**File**: `screen_receiver.cpp` | **Status**: ✅ render, 🖱️ transport nyata, 🖱️ badge "Terhubung" → FR-NEW-1
 - [x] Header ikon BLUETOOTH + "BT Receiver" + badge MENU + baterai.
 - [x] Kartu hero ungu `COLOR_BT_HERO` 296×110px radius20, ikon bluetooth besar (18px), badge "Terhubung" (hijau+centang) pojok kanan-atas.
 - [x] Caption judul/artis mengikuti track demo yang dipilih (3 pasangan, state persisten `s_track_idx`).
@@ -180,7 +189,7 @@ Legenda status verifikasi yang dipakai di tiap FR di bawah:
 - [x] Footer: "Audio dari ponsel via Bluetooth".
 
 #### FR-L5 — BT Transmitter
-**File**: `screen_transmitter.cpp` | **Status**: ✅ render, 🖱️ transport nyata
+**File**: `screen_transmitter.cpp` | **Status**: ✅ render, 🖱️ transport nyata, 🖱️ badge "Terhubung" → FR-NEW-1
 - [x] Header BLUETOOTH + "BT Transmitter" + badge MENU + baterai.
 - [x] Kartu hero ungu 296×92px radius20 dengan 3 ikon rantai sinyal `PLAY → NEXT → WIFI` (sumber → kirim → speaker) + badge "Terhubung".
 - [x] Caption judul + posisi playlist (format "N / 18") mengikuti track demo yang dipilih (3 entri, state persisten `s_track_idx`).

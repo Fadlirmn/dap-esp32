@@ -22,7 +22,8 @@ ESP32.
 | ![Now Playing](screenshots/01-now-playing.png)<br>1. Now Playing | ![Daftar Lagu](screenshots/02-daftar-lagu.png)<br>2. Daftar Lagu | ![Menu mode](screenshots/03-menu-mode.png)<br>3. Menu mode |
 | ![BT Receiver](screenshots/04-bt-receiver.png)<br>4. BT Receiver | ![BT Transmitter](screenshots/05-bt-transmitter.png)<br>5. BT Transmitter | ![Transfer File](screenshots/06-transfer-file.png)<br>6. Transfer File |
 | ![Beralih mode](screenshots/07-beralih-mode.png)<br>7. Beralih mode | ![Daftar playlist](screenshots/08-daftar-playlist.png)<br>8. Daftar playlist | ![Isi playlist](screenshots/09-isi-playlist.png)<br>9. Isi playlist |
-| ![Volume berubah](screenshots/10-volume.png)<br>10. Volume HUD (overlay) | ![Baterai rendah](screenshots/11-baterai-rendah.png)<br>11. Baterai rendah (overlay) | |
+| ![Volume berubah](screenshots/10-volume.png)<br>10. Volume HUD (overlay) | ![Baterai rendah](screenshots/11-baterai-rendah.png)<br>11. Baterai rendah (overlay) | ![Pilih perangkat (BT Receiver)](screenshots/12-pilih-perangkat-rx.png)<br>12. Pilih Perangkat — RX |
+| ![Pilih perangkat (BT Transmitter)](screenshots/13-pilih-perangkat-tx.png)<br>13. Pilih Perangkat — TX | | |
 
 ## Board → file map
 
@@ -39,21 +40,27 @@ ESP32.
 | L9 / L10 | Volume berubah / senyap | `overlay_volume.*` (one widget, 2 states) |
 | L11 | Daftar playlist | `screen_playlists.*` |
 | L12 | Isi playlist | `screen_playlist_detail.*` |
+| *(baru)* | Pilih Perangkat (RX/TX) | `screen_bt_devices.*` — not one of the original 12 boards; added so BT Receiver/Transmitter have an actual menu to connect to a device from, instead of just claiming "Terhubung" with nothing chosen. Menu's BT tiles go here first; the connected badge on Receiver/Transmitter taps back to it ("ganti perangkat"). |
 
 Shared chrome/icons/theme: `ui_common.*`, `ui_icons.*`, `ui_theme.h`.
 Lazy screen lifecycle (only one screen's widgets exist at a time, to fit a
-no-PSRAM budget across 9 screens): `screen_manager.*`.
+no-PSRAM budget across 9+ screens): `screen_manager.*`.
 
 ## Navigation
 
 Real click-driven navigation (not just the demo data):
 - Any screen's "MENU" badge (top-right, home icon) → Menu grid.
-- A Menu tile → that screen (Daftar Lagu, Playlist, Local Player, BT
-  Receiver, BT Transmitter, Transfer File; "Kembali" → Now Playing).
+- A Menu tile → that screen (Daftar Lagu, Playlist, Local Player, Transfer
+  File; "Kembali" → Now Playing). The two BT tiles go to **Pilih Perangkat**
+  (`screen_bt_devices.cpp`, not one of the original 12 boards) first.
+- A device row on Pilih Perangkat → BT Receiver/Transmitter (whichever list
+  it was); the "Terhubung" badge there taps back to that same device list
+  ("ganti perangkat") — a real round trip, not a dead-end "always connected".
 - A Playlists row → that playlist's detail screen; the detail screen's
   back-chevron → back to Playlists.
-- A Library row / a Playlist-detail track row → moves the "now playing"
-  marker to that row (persists across screen rebuilds).
+- A Library row / a Playlist-detail track row → "play this song" (jumps to
+  Now Playing) — no row highlight/selection anywhere in these lists by
+  design.
 - Playlist-detail's "Putar" button → jumps to Now Playing (a real "play this
   playlist" action); "Acak"/"Ulang" are plain buttons with no real
   shuffle/repeat engine behind them, so they intentionally don't fake a

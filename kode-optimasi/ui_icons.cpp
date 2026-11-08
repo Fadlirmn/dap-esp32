@@ -40,6 +40,7 @@ lv_obj_t *icon_connected_badge(lv_obj_t *parent) {
     lv_obj_set_style_bg_color(badge, COLOR_SUCCESS, 0);
     lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(badge, 0, 0);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_70, LV_STATE_PRESSED); // press feedback, see ui_common.cpp's ui_button_create -- both call sites (receiver/transmitter) make this clickable ("ganti perangkat")
 
     lv_obj_t *check = lv_label_create(badge);
     lv_label_set_text(check, LV_SYMBOL_OK);

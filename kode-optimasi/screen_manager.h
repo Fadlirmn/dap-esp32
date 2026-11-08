@@ -16,6 +16,8 @@ typedef enum {
     SCREEN_SWITCH,
     SCREEN_PLAYLISTS,
     SCREEN_PLAYLIST_DETAIL,
+    SCREEN_BT_DEVICES_RX, // "pilih perangkat" before BT Receiver -- new, not one of the original 12 boards
+    SCREEN_BT_DEVICES_TX, // same screen/logic, reused for BT Transmitter's device list
     SCREEN_COUNT
 } ScreenId;
 

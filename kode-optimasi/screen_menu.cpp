@@ -54,8 +54,8 @@ void screen_menu_create(lv_obj_t *parent) {
     make_tile(scr, x0, y0 + 0 * row_step, w, h, false, LV_SYMBOL_LIST, "Daftar Lagu", NULL, SCREEN_LIBRARY);
     make_tile(scr, x1, y0 + 0 * row_step, w, h, false, LV_SYMBOL_AUDIO, "Playlist", NULL, SCREEN_PLAYLISTS);
     make_tile(scr, x0, y0 + 1 * row_step, w, h, false, LV_SYMBOL_PLAY, "Local Player", NULL, SCREEN_NOW_PLAYING);
-    make_tile(scr, x1, y0 + 1 * row_step, w, h, false, LV_SYMBOL_BLUETOOTH, "BT Receiver", NULL, SCREEN_RECEIVER);
-    make_tile(scr, x0, y0 + 2 * row_step, w, h, false, LV_SYMBOL_BLUETOOTH, "BT Transmitter", NULL, SCREEN_TRANSMITTER);
+    make_tile(scr, x1, y0 + 1 * row_step, w, h, false, LV_SYMBOL_BLUETOOTH, "BT Receiver", NULL, SCREEN_BT_DEVICES_RX);
+    make_tile(scr, x0, y0 + 2 * row_step, w, h, false, LV_SYMBOL_BLUETOOTH, "BT Transmitter", NULL, SCREEN_BT_DEVICES_TX);
     make_tile(scr, x1, y0 + 2 * row_step, w, h, false, LV_SYMBOL_UPLOAD, "Transfer File", NULL, SCREEN_TRANSFER);
     make_tile(scr, x0, y0 + 3 * row_step, w, h, false, LV_SYMBOL_LEFT, "Kembali", NULL, SCREEN_NOW_PLAYING);
 
