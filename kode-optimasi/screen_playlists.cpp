@@ -42,6 +42,7 @@ void screen_playlists_create(lv_obj_t *parent) {
         lv_obj_t *row = ui_list_row_create(scr, first_y + i * (row_h + row_gap), row_h, false);
         lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(row, row_clicked_cb, LV_EVENT_CLICKED, NULL);
+        lv_group_add_obj(screen_manager_group(), row);
 
         lv_obj_t *chip = lv_obj_create(row);
         lv_obj_remove_style_all(chip);

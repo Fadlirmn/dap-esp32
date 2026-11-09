@@ -74,6 +74,7 @@ lv_obj_t *ui_header_create(lv_obj_t *screen, const char *header_icon, const char
         lv_obj_add_flag(badge, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(badge, menu_badge_clicked_cb, LV_EVENT_CLICKED, NULL);
         lv_obj_set_style_bg_opa(badge, LV_OPA_70, LV_STATE_PRESSED); // press feedback, see ui_button_create
+        lv_group_add_obj(screen_manager_group(), badge); // reachable via PREV/NEXT on every screen that has it
     }
 
     icon_battery(right, battery_percent);
@@ -121,6 +122,7 @@ lv_obj_t *ui_button_create(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coor
     // every clickable widget in the app was giving zero visual feedback on
     // click before this).
     lv_obj_set_style_bg_opa(btn, LV_OPA_70, LV_STATE_PRESSED);
+    lv_group_add_obj(screen_manager_group(), btn); // reachable via physical PREV/NEXT, see input.cpp
     return btn;
 }
 

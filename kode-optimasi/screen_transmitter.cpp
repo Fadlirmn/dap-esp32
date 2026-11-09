@@ -63,10 +63,14 @@ static void prev_clicked_cb(lv_event_t *e) {
     refresh_track_labels();
 }
 
-static void next_clicked_cb(lv_event_t *e) {
-    LV_UNUSED(e);
+void transmitter_next_track(void) {
     s_track_idx = (s_track_idx + 1) % DEMO_TRACK_COUNT;
     refresh_track_labels();
+}
+
+static void next_clicked_cb(lv_event_t *e) {
+    LV_UNUSED(e);
+    transmitter_next_track();
 }
 
 static void on_screen_deleted(lv_event_t *e) {
@@ -95,6 +99,7 @@ void screen_transmitter_create(lv_obj_t *parent) {
     lv_obj_set_pos(badge, card_w - 28, 6);
     lv_obj_add_flag(badge, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(badge, badge_clicked_cb, LV_EVENT_CLICKED, NULL);
+    lv_group_add_obj(screen_manager_group(), badge);
     lv_obj_add_event_cb(card, on_screen_deleted, LV_EVENT_DELETE, NULL);
 
     lv_obj_t *caption = lv_obj_create(card);

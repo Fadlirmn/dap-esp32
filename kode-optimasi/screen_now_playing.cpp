@@ -80,10 +80,7 @@ static void prev_clicked_cb(lv_event_t *e) {
 
 static void next_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
-    s_track_idx = (s_track_idx + 1) % DEMO_TRACK_COUNT;
-    s_elapsed_sec = 0;
-    now_playing_set_track_info(kDemoTracks[s_track_idx].title, kDemoTracks[s_track_idx].subtitle);
-    refresh_progress_display();
+    now_playing_next_track();
 }
 
 void screen_now_playing_create(lv_obj_t *parent) {
@@ -182,6 +179,13 @@ void now_playing_set_progress(uint8_t percent, const char *elapsed, const char *
 void now_playing_set_playing(bool is_playing) {
     if (s_play_icon) lv_label_set_text(s_play_icon, is_playing ? LV_SYMBOL_PAUSE : LV_SYMBOL_PLAY);
     cassette_anim_set_spinning(is_playing);
+}
+
+void now_playing_next_track(void) {
+    s_track_idx = (s_track_idx + 1) % DEMO_TRACK_COUNT;
+    s_elapsed_sec = 0;
+    now_playing_set_track_info(kDemoTracks[s_track_idx].title, kDemoTracks[s_track_idx].subtitle);
+    refresh_progress_display();
 }
 
 void now_playing_set_battery(int percent) {

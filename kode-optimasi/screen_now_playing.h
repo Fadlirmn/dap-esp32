@@ -11,5 +11,6 @@ void now_playing_set_track_info(const char *title, const char *subtitle);
 void now_playing_set_progress(uint8_t percent, const char *elapsed, const char *total);
 void now_playing_set_playing(bool is_playing);
 void now_playing_set_battery(int percent);
+void now_playing_next_track(void); // same action as tapping the on-screen NEXT button
 bool now_playing_is_playing(void); // so the elapsed-time tick (demo_cycle.cpp) can stop advancing while paused
 void now_playing_tick_elapsed(void); // advances elapsed by 1s against the CURRENT track's own duration

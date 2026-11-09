@@ -63,6 +63,7 @@ static lv_obj_t *create(lv_obj_t *scr, const char *title, const BtDevice *device
         lv_obj_t *row = ui_list_row_create(scr, first_y + i * (row_h + row_gap), row_h, false);
         lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(row, row_clicked_cb, LV_EVENT_CLICKED, NULL);
+        lv_group_add_obj(screen_manager_group(), row);
         icon_symbol(row, LV_SYMBOL_BLUETOOTH, COLOR_ACCENT, FONT_SMALL);
         ui_row_text_create(row, devices[i].name, "");
     }
@@ -144,6 +145,7 @@ static void rebuild_tx_rows(void) {
         lv_obj_t *row = ui_list_row_create(s_tx_list, i * (row_h + row_gap), row_h, false);
         lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(row, tx_result_row_clicked_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+        lv_group_add_obj(screen_manager_group(), row);
         icon_symbol(row, LV_SYMBOL_BLUETOOTH, COLOR_ACCENT, FONT_SMALL);
         ui_row_text_create(row, bt_tx_scan_name(i), "");
     }

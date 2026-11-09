@@ -24,3 +24,9 @@ typedef enum {
 void screen_manager_init(ScreenId initial);
 void screen_manager_show(ScreenId id);
 ScreenId screen_manager_current(void);
+
+// The current screen's focus ring for the physical PREV/NEXT/ENC_SW indev
+// (see input.cpp) -- cleared automatically on every screen_manager_show(),
+// so each screen_*_create() just adds its own clickable buttons/rows to it
+// right after creating them, in the order PREV/NEXT should tab through.
+lv_group_t *screen_manager_group(void);

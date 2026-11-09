@@ -4,9 +4,11 @@
 // This is the one firmware project in this repo (final-form/ was retired
 // once its subsystems were ported in here). Real: BT A2DP scan/pair
 // (bt_backend.cpp), WiFi AP file transfer (wifi_transfer.cpp), MP3 decode +
-// I2S output (audio_decoder.cpp/i2s_output.cpp). Still demo/static data:
-// Library/Playlists track catalog (see the hardcoded test track in setup()
-// below), and no physical button/encoder/touch input yet.
+// I2S output (audio_decoder.cpp/i2s_output.cpp), physical rotary
+// encoder+3-button input (input.cpp -- PREV/NEXT move focus, ENC_SW
+// confirms, rotate = volume, MENU jumps to the mode grid). Still demo/static
+// data: Library/Playlists track catalog (see the hardcoded test track in
+// setup() below), and no touchscreen input yet.
 //
 // Setup needed before this compiles: see README.md for lv_conf.h placement
 // and the TFT_eSPI_User_Setup.h pin/driver copy step.
@@ -22,6 +24,7 @@
 #include "wifi_transfer.h"
 #include "audio_decoder.h"
 #include "i2s_output.h"
+#include "input.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -56,6 +59,7 @@ static void guiTask(void *pv) {
         lv_timer_handler();
         bt_backend_tick(); // cheap: just checks the BT scan timeout, see bt_backend.cpp
         wifiTransferPoll(); // server.handleClient(), cheap no-op when no client connected
+        inputPoll(); // encoder/button debounce, see input.cpp
         vTaskDelay(pdMS_TO_TICKS(66)); // 15 FPS: drives redraw + the cassette reel anim
     }
 }
@@ -77,6 +81,7 @@ void setup() {
 
     screen_manager_init(SCREEN_NOW_PLAYING);
     demo_cycle_init();
+    inputSetup(); // registers the encoder indev -- after screen_manager_init() so its group already exists
 
     if (!SD.begin(PIN_SD_CS)) {
         delay(250);

@@ -95,6 +95,7 @@ void screen_playlist_detail_create(lv_obj_t *parent) {
     lv_obj_t *back_area = lv_obj_get_child(header, 0); // the icon+title container (see ui_header_create)
     lv_obj_add_flag(back_area, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(back_area, back_clicked_cb, LV_EVENT_CLICKED, NULL);
+    lv_group_add_obj(screen_manager_group(), back_area);
     lv_obj_set_style_bg_color(back_area, COLOR_SELECTED, 0);
     lv_obj_set_style_bg_opa(back_area, LV_OPA_TRANSP, 0);
     lv_obj_set_style_bg_opa(back_area, LV_OPA_60, LV_STATE_PRESSED); // press feedback, see ui_button_create
@@ -126,6 +127,7 @@ void screen_playlist_detail_create(lv_obj_t *parent) {
         lv_obj_t *row = track_row(scr, list_x, first_y + i * (row_h + row_gap), list_w, row_h, selected);
         lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(row, row_clicked_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
+        lv_group_add_obj(screen_manager_group(), row);
         if (selected) {
             icon_equalizer_bars(row, COLOR_ACCENT);
         } else {

@@ -82,6 +82,7 @@ void screen_library_create(lv_obj_t *parent) {
         lv_obj_t *r = ui_list_row_create(scr, first_y + row * (row_h + row_gap), row_h, false);
         lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(r, row_clicked_cb, LV_EVENT_CLICKED, NULL);
+        lv_group_add_obj(screen_manager_group(), r);
         lv_obj_t *idx = lv_label_create(r);
         lv_label_set_text_fmt(idx, "%02d", i + 1);
         lv_obj_set_style_text_color(idx, COLOR_TEXT_MUTED, 0);
@@ -98,9 +99,11 @@ void screen_library_create(lv_obj_t *parent) {
     lv_obj_align(prev_page, LV_ALIGN_LEFT_MID, 10, 0);
     lv_obj_add_flag(prev_page, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(prev_page, prev_page_cb, LV_EVENT_CLICKED, NULL);
+    lv_group_add_obj(screen_manager_group(), prev_page);
 
     lv_obj_t *next_page = icon_symbol(footer, LV_SYMBOL_RIGHT, COLOR_TEXT_MUTED, FONT_SMALL);
     lv_obj_align(next_page, LV_ALIGN_RIGHT_MID, -10, 0);
     lv_obj_add_flag(next_page, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(next_page, next_page_cb, LV_EVENT_CLICKED, NULL);
+    lv_group_add_obj(screen_manager_group(), next_page);
 }

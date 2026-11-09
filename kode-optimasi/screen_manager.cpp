@@ -13,6 +13,7 @@
 
 static lv_obj_t *s_root = NULL;   // one persistent screen, loaded exactly once
 static ScreenId s_current = SCREEN_COUNT; // invalid until first show
+static lv_group_t *s_group = NULL;
 
 static void build_screen(lv_obj_t *root, ScreenId id) {
     switch (id) {
@@ -33,6 +34,7 @@ static void build_screen(lv_obj_t *root, ScreenId id) {
 
 void screen_manager_init(ScreenId initial) {
     s_root = ui_screen_create();
+    s_group = lv_group_create();
     lv_scr_load(s_root); // the only lv_scr_load* call in this codebase
     screen_manager_show(initial);
 }
@@ -46,10 +48,17 @@ void screen_manager_show(ScreenId id) {
     // screen behind lv_scr_load's back corrupted that bookkeeping and
     // crashed -- caught by the desktop sim).
     lv_obj_clean(s_root);
+    // The old screen's objects were just freed above -- drop any stale
+    // pointers to them before the next screen adds its own.
+    lv_group_remove_all_objs(s_group);
     build_screen(s_root, id);
     s_current = id;
 }
 
 ScreenId screen_manager_current(void) {
     return s_current;
+}
+
+lv_group_t *screen_manager_group(void) {
+    return s_group;
 }
