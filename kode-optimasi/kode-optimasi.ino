@@ -25,6 +25,7 @@
 #include "audio_decoder.h"
 #include "i2s_output.h"
 #include "input.h"
+#include "touch.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -82,6 +83,15 @@ void setup() {
     screen_manager_init(SCREEN_NOW_PLAYING);
     demo_cycle_init();
     inputSetup(); // registers the encoder indev -- after screen_manager_init() so its group already exists
+
+#if ENABLE_TOUCH
+    touchSetup();
+    static lv_indev_drv_t touch_indev_drv;
+    lv_indev_drv_init(&touch_indev_drv);
+    touch_indev_drv.type = LV_INDEV_TYPE_POINTER;
+    touch_indev_drv.read_cb = touch_read_cb;
+    lv_indev_drv_register(&touch_indev_drv);
+#endif
 
     if (!SD.begin(PIN_SD_CS)) {
         delay(250);
