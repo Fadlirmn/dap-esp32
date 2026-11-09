@@ -2,6 +2,7 @@
 #include "lvgl.h"
 #include "screen_manager.h"
 #include "screen_now_playing.h"
+#include "screen_transfer.h"
 #include "overlay_alert.h"
 
 // Screen navigation is now real (click the "MENU" badge / a Menu tile / a
@@ -32,7 +33,17 @@ static void demo_elapsed_tick_cb(lv_timer_t *t) {
     now_playing_tick_elapsed();
 }
 
+// Refreshes the Transfer screen's files-received/upload-progress labels from
+// wifi_transfer.h's globals (the AP/server run for the whole boot, not just
+// while this screen is up, but there's nothing to show elsewhere).
+static void transfer_tick_cb(lv_timer_t *t) {
+    LV_UNUSED(t);
+    if (screen_manager_current() != SCREEN_TRANSFER) return;
+    screen_transfer_tick();
+}
+
 void demo_cycle_init(void) {
     lv_timer_create(demo_cycle_overlays_cb, 12000, NULL);
     lv_timer_create(demo_elapsed_tick_cb, 1000, NULL);
+    lv_timer_create(transfer_tick_cb, 1000, NULL);
 }

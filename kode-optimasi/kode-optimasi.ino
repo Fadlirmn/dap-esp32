@@ -1,13 +1,16 @@
 // LVGL 8.x port of the 12-board dap-ui-landscape mockup, for ESP32 WROOM-32
 // (no PSRAM) + ILI9341/ST7789 320x240 landscape via TFT_eSPI.
 //
-// This is a UI shell with demo/static data only (see README.md) — no real
-// SD/audio/BT/WiFi backend. A later integration pass swaps the demo timers
-// below for real input/audio/BT events via each screen's public setters.
+// This is the one firmware project in this repo (final-form/ was retired
+// once its subsystems were ported in here). Real: BT A2DP scan/pair
+// (bt_backend.cpp), WiFi AP file transfer (wifi_transfer.cpp). Still
+// demo/static data: Library/Playlists track catalog, and no real
+// audio decode/I2S output or physical button/encoder/touch input yet.
 //
 // Setup needed before this compiles: see README.md for lv_conf.h placement
 // and the TFT_eSPI_User_Setup.h pin/driver copy step.
 #include <SPI.h>
+#include <SD.h>
 #include <TFT_eSPI.h>
 #include <lvgl.h>
 
@@ -15,6 +18,7 @@
 #include "screen_manager.h"
 #include "demo_cycle.h"
 #include "bt_backend.h"
+#include "wifi_transfer.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -48,6 +52,7 @@ static void guiTask(void *pv) {
         last_ms = now_ms;
         lv_timer_handler();
         bt_backend_tick(); // cheap: just checks the BT scan timeout, see bt_backend.cpp
+        wifiTransferPoll(); // server.handleClient(), cheap no-op when no client connected
         vTaskDelay(pdMS_TO_TICKS(66)); // 15 FPS: drives redraw + the cassette reel anim
     }
 }
@@ -79,6 +84,12 @@ void setup() {
 
     screen_manager_init(SCREEN_NOW_PLAYING);
     demo_cycle_init();
+
+    if (!SD.begin(PIN_SD_CS)) {
+        delay(250);
+        SD.begin(PIN_SD_CS); // one retry -- SD cards can be slow to settle on power-up
+    }
+    wifiTransferSetup();
 
     xTaskCreatePinnedToCore(guiTask, "GUI", 10240, NULL, 2, NULL, 1);
     xTaskCreatePinnedToCore(audioTaskStub, "AudioStub", 4096, NULL, 3, NULL, 0);
