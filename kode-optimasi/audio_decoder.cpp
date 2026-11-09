@@ -172,6 +172,24 @@ void mp3DecoderTask(void *pvParameters) {
     }
 }
 
+bool audioDecoderOpenTrack(const char *path) {
+    if (audioFileMutex) xSemaphoreTake(audioFileMutex, portMAX_DELAY);
+    if (audioFile) audioFile.close();
+    audioFile = SD.open(path, FILE_READ);
+    bool opened = audioFile && !audioFile.isDirectory() && audioFile.size() >= 512;
+    if (opened) {
+        g_file_size = audioFile.size();
+        g_file_bytes_read = 0;
+    } else {
+        if (audioFile) audioFile.close();
+        g_file_size = 0;
+    }
+    if (audioFileMutex) xSemaphoreGive(audioFileMutex);
+    decoder_reset_requested = true;
+    if (pcm_frame_queue) xQueueReset(pcm_frame_queue);
+    return opened;
+}
+
 void seekToRatio(float ratio) {
     if (g_file_size == 0 || !audioFile) return;
 

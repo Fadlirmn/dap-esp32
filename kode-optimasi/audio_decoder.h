@@ -31,3 +31,8 @@ void mp3DecoderTask(void *pvParameters);
 
 // Seeks the current track to `ratio` (0..1) of its file size.
 void seekToRatio(float ratio);
+
+// Opens `path` as the current track (closes whatever was open first, resets
+// the decoder/PCM queue) -- does NOT touch is_playing, caller decides.
+// Returns false if the file doesn't exist / isn't a plausible MP3.
+bool audioDecoderOpenTrack(const char *path);

@@ -6,9 +6,9 @@
 // (bt_backend.cpp), WiFi AP file transfer (wifi_transfer.cpp), MP3 decode +
 // I2S output (audio_decoder.cpp/i2s_output.cpp), physical rotary
 // encoder+3-button input (input.cpp -- PREV/NEXT move focus, ENC_SW
-// confirms, rotate = volume, MENU jumps to the mode grid). Still demo/static
-// data: Library/Playlists track catalog (see the hardcoded test track in
-// setup() below), and no touchscreen input yet.
+// confirms, rotate = volume, MENU jumps to the mode grid), touch
+// (touch.cpp), and the Library screen's real SD-card track list
+// (screen_library.cpp). Still demo/static data: Playlists.
 //
 // Setup needed before this compiles: see README.md for lv_conf.h placement
 // and the TFT_eSPI_User_Setup.h pin/driver copy step.
@@ -102,21 +102,8 @@ void setup() {
     audioDecoderSetup();
     i2sOutputSetup();
     startDecoderTask();
-
-    // ponytail: hardcoded test track standing in for a real file picker --
-    // screen_library.cpp stays demo-data (out of scope here, see its
-    // README), swap this for whatever that picker opens once it's wired up.
-    if (audioFileMutex) xSemaphoreTake(audioFileMutex, portMAX_DELAY);
-    audioFile = SD.open("/tracks/test.mp3", FILE_READ);
-    if (audioFile && !audioFile.isDirectory() && audioFile.size() >= 512) {
-        g_file_size = audioFile.size();
-        g_file_bytes_read = 0;
-        is_playing = true;
-    } else {
-        if (audioFile) audioFile.close();
-        g_file_size = 0;
-    }
-    if (audioFileMutex) xSemaphoreGive(audioFileMutex);
+    // No track opens at boot -- screen_library.cpp's real SD scan is how a
+    // track gets picked now (is_playing stays false until the user does).
 
     xTaskCreatePinnedToCore(guiTask, "GUI", 10240, NULL, 2, NULL, 1);
 }

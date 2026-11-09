@@ -1,11 +1,18 @@
-// L2 "Daftar Lagu" (song list). Demo data only — a future pass wires this to
-// the real SD-card playlist.
+// L2 "Daftar Lagu" (song list). Sim: demo data. Real build: lists
+// /tracks/*.mp3 off the SD card and actually opens+plays whichever row gets
+// clicked (audio_decoder.cpp).
 #include "screen_library.h"
 #include "ui_common.h"
 #include "ui_icons.h"
 #include "ui_theme.h"
 #include "display_pins.h"
 #include "screen_manager.h"
+#include <stdint.h>
+#ifndef KODE_OPTIMASI_SIM
+#include <SD.h>
+#include "audio_decoder.h"
+#include "screen_now_playing.h"
+#endif
 
 struct Song { const char *title; const char *duration; };
 #ifdef KODE_OPTIMASI_SIM
@@ -23,10 +30,39 @@ static const Song kSongs[] = {
 };
 #define SONG_COUNT (int)(sizeof(kSongs) / sizeof(kSongs[0]))
 #else
-// No demo catalog in the real build -- empty-state handled below, a future
-// pass wires this to the real SD-card playlist.
-static const Song *kSongs = NULL;
-#define SONG_COUNT 0
+// Scanned from /tracks on the SD card, once (see scan_tracks_once below) --
+// MAX_TRACKS caps worst-case RAM the same way PAGE_SIZE caps worst-case
+// widget count: a real library could have hundreds of files, this doesn't
+// need to hold all of them, just as many as this UI will ever page through.
+#define MAX_TRACKS 64
+struct Track { char path[48]; char name[32]; };
+static Track s_tracks[MAX_TRACKS];
+static int s_track_count = -1; // -1 = not scanned yet
+
+static void scan_tracks_once(void) {
+    if (s_track_count >= 0) return;
+    s_track_count = 0;
+    File dir = SD.open("/tracks");
+    if (!dir || !dir.isDirectory()) { if (dir) dir.close(); return; }
+    for (File f = dir.openNextFile(); f && s_track_count < MAX_TRACKS; f = dir.openNextFile()) {
+        if (!f.isDirectory()) {
+            String name = f.name();
+            int slash = name.lastIndexOf('/');
+            if (slash >= 0) name = name.substring(slash + 1);
+            if (name.endsWith(".mp3") || name.endsWith(".MP3")) {
+                Track &t = s_tracks[s_track_count];
+                snprintf(t.path, sizeof(t.path), "/tracks/%s", name.c_str());
+                String display = name.substring(0, name.length() - 4); // strip ".mp3"
+                snprintf(t.name, sizeof(t.name), "%s", display.c_str());
+                s_track_count++;
+            }
+        }
+        f.close();
+    }
+    dir.close();
+}
+
+#define SONG_COUNT s_track_count
 #endif
 #define PAGE_SIZE 5
 #define PAGE_COUNT ((SONG_COUNT + PAGE_SIZE - 1) / PAGE_SIZE)
@@ -41,7 +77,15 @@ static int s_page = 0;
 // selected/highlighted) -- a row click is just "play this song", a real
 // action (-> Now Playing), not a local state change with nothing to show.
 static void row_clicked_cb(lv_event_t *e) {
+#ifndef KODE_OPTIMASI_SIM
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    if (i >= 0 && i < s_track_count && audioDecoderOpenTrack(s_tracks[i].path)) {
+        is_playing = true;
+        now_playing_set_track_info(s_tracks[i].name, "");
+    }
+#else
     LV_UNUSED(e);
+#endif
     screen_manager_show(SCREEN_NOW_PLAYING);
 }
 
@@ -58,6 +102,9 @@ static void next_page_cb(lv_event_t *e) {
 }
 
 void screen_library_create(lv_obj_t *parent) {
+#ifndef KODE_OPTIMASI_SIM
+    scan_tracks_once();
+#endif
     lv_obj_t *scr = parent;
     ui_header_create(scr, LV_SYMBOL_LIST, "Daftar Lagu", true, 78);
 
@@ -81,14 +128,18 @@ void screen_library_create(lv_obj_t *parent) {
         int i = page_start + row;
         lv_obj_t *r = ui_list_row_create(scr, first_y + row * (row_h + row_gap), row_h, false);
         lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(r, row_clicked_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_event_cb(r, row_clicked_cb, LV_EVENT_CLICKED, (void *)(intptr_t)i);
         lv_group_add_obj(screen_manager_group(), r);
         lv_obj_t *idx = lv_label_create(r);
         lv_label_set_text_fmt(idx, "%02d", i + 1);
         lv_obj_set_style_text_color(idx, COLOR_TEXT_MUTED, 0);
         lv_obj_set_style_text_font(idx, FONT_SMALL, 0);
         lv_obj_set_width(idx, 22);
+#ifdef KODE_OPTIMASI_SIM
         ui_row_text_create(r, kSongs[i].title, kSongs[i].duration);
+#else
+        ui_row_text_create(r, s_tracks[i].name, "");
+#endif
     }
 
     lv_obj_t *footer = ui_footer_create(scr, "");

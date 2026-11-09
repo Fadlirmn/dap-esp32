@@ -11,11 +11,11 @@ subsystems (listed below) were ported in here.
 I2S output (`audio_decoder.*`/`i2s_output.*`), WiFi AP file transfer
 (`wifi_transfer.*`), physical rotary encoder + 3-button input (`input.*`,
 PREV/NEXT navigate focus, ENC_SW confirms/double-click skips track, rotate =
-volume, MENU jumps to the mode grid), XPT2046 touch (`touch.*`).
+volume, MENU jumps to the mode grid), XPT2046 touch (`touch.*`), and the
+Library screen's track list (`screen_library.cpp` scans `/tracks/*.mp3` on
+the SD card; tapping a row opens and plays that file for real).
 
-**Still demo/static data**: the Library/Playlists track catalog (one
-hardcoded test file opens at boot as a placeholder, see the `ponytail:`
-comment in `kode-optimasi.ino`'s `setup()`) and the header battery
+**Still demo/static data**: the Playlists catalog and the header battery
 percentage.
 
 ## Galeri
@@ -84,16 +84,17 @@ as the dummy-data gating.
   etc.) — this needs no local decoder since it's just a remote-control
   signal, same as a BT headset's buttons.
 - **Audio is real too, now**: the source streams `audio_decoder.cpp`'s
-  `get_sound_data()` (SD → minimp3 → PCM) instead of silence; the sink
-  forwards received PCM straight to `i2s_output.cpp`'s DAC output. BT
-  Transmitter's own on-screen play/pause/prev/next still only affect what's
-  displayed (no local playlist to control — see the `ponytail:` placeholder
-  in `kode-optimasi.ino`), but the stream itself is real audio.
+  `get_sound_data()` (SD → minimp3 → PCM) instead of silence — whichever
+  track the Library screen last opened (see below), or silence if none has
+  been picked yet; the sink forwards received PCM straight to
+  `i2s_output.cpp`'s DAC output. BT Transmitter's own on-screen
+  play/pause/prev/next still only affect what's displayed, not which file is
+  actually streaming — picking a track is Library's job, not this screen's.
 - Verified by actually compiling this folder for `esp32dev` with the BT
   backend + decoder + WiFi + input all linked in: links cleanly with
   `board_build.partitions = huge_app.csv` in `platformio.ini` (the default
   ESP32 partition table is too small for this combined footprint). **RAM
-  35.7% (117 KB), Flash 78.0% (2.45 MB of 3 MB)**.
+  37.3% (119.3 KB), Flash 78.1% (2.46 MB of 3 MB)**.
 
 ## Navigation
 
@@ -135,11 +136,10 @@ Real click-driven navigation (not just the demo data):
   clicked once.
 
 **Still demo-only by design**: the battery percentage (`now_playing_set_battery()`
-is a no-op stub) and the Library/Playlists track catalog (one hardcoded test
-file stands in for a real file picker — see the `ponytail:` comment in
-`kode-optimasi.ino`). BT scan/connect/AVRCP/audio, WiFi transfer, and
-physical input are all real on hardware now — see "Real Bluetooth" and
-"On real hardware" above.
+is a no-op stub) and the Playlists catalog. BT scan/connect/AVRCP/audio,
+WiFi transfer, physical input, and the Library screen's SD-card track list
+are all real on hardware now — see "Real Bluetooth" and "On real hardware"
+above.
 
 **On real hardware**, the same navigation above works via three input paths,
 all registered in `kode-optimasi.ino`'s `setup()`:
@@ -181,7 +181,7 @@ all registered in `kode-optimasi.ino`'s `setup()`:
 
 Verified by actually compiling this folder for `esp32dev`/Arduino against real
 `lvgl@8.4.0` + `TFT_eSPI@2.5.43` + `ESP32-A2DP` + `XPT2046_Touchscreen`: links
-cleanly — **RAM 35.7% (117 KB), Flash 78.0% (2.45 MB of 3 MB, via
+cleanly — **RAM 37.3% (119.3 KB), Flash 78.1% (2.46 MB of 3 MB, via
 `huge_app.csv`)** — confirms the no-PSRAM RAM budget holds with all 13
 screens + 2 overlays + BT source/sink + MP3 decode/I2S + WiFi transfer +
 physical input all linked in (only one screen's widgets exist at a time at
@@ -234,6 +234,10 @@ This caught three real bugs no static review did:
 - `now_playing_set_battery()` is a no-op stub; the header battery is demo-static
   (explicitly out of scope — everything else that looked like a dummy control
   was wired to real, persistent local state instead, see Navigation above).
-- The Library/Playlists track catalog is one hardcoded test file, not a real
-  SD-card file picker — see the `ponytail:` comment in `kode-optimasi.ino`'s
-  `setup()`.
+- The Playlists catalog is still demo-only — Library is the one screen
+  wired to the real SD card (`/tracks/*.mp3`, up to `MAX_TRACKS` = 64, see
+  `screen_library.cpp`).
+- No MP3 duration is read — Library shows filenames with no length column,
+  and Now Playing's progress bar/elapsed time stay at 0:00 for a
+  library-opened track (computing real duration would need a full-file
+  scan; out of scope for now).
