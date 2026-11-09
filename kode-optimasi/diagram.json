@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "author": "DAP-Esp32Devkit",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-ili9341", "id": "tft", "top": -20, "left": 150, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:3V3", "tft:VCC", "red", [] ],
+    [ "esp:GND.1", "tft:GND", "black", [] ],
+    [ "esp:18", "tft:SCK", "green", [] ],
+    [ "esp:23", "tft:SDA", "blue", [] ],
+    [ "esp:19", "tft:SDO", "yellow", [] ],
+    [ "esp:17", "tft:CS", "orange", [] ],
+    [ "esp:27", "tft:D/C", "purple", [] ],
+    [ "esp:33", "tft:RESET", "brown", [] ],
+    [ "esp:3V3", "tft:LED", "red", [] ]
+  ]
+}
