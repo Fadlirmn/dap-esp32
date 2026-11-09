@@ -10,6 +10,8 @@
 #include <BluetoothA2DPSink.h>
 #include <esp_gap_bt_api.h>
 #include <string.h>
+#include "audio_decoder.h"
+#include "i2s_output.h"
 
 enum class BtRole { NONE, SOURCE, SINK };
 static BtRole s_role = BtRole::NONE;
@@ -28,21 +30,13 @@ static esp_bd_addr_t s_savedAddr = {0, 0, 0, 0, 0, 0};
 static String s_savedName = "Tidak ada speaker";
 static volatile bool s_txConnected = false;
 
-// No real audio source in this UI-only module yet (see README.md) -- stream
-// silence so pairing/connection still works for real; a later pass swaps
-// this for an actual SD/decoder feed.
-static int32_t tx_fill_silence(Frame *data, int32_t frame_count) {
-    memset(data, 0, sizeof(Frame) * frame_count);
-    return frame_count;
-}
-
 static void on_tx_connection_state(esp_a2d_connection_state_t state, void *obj) {
     (void)obj;
     s_txConnected = (state == ESP_A2D_CONNECTION_STATE_CONNECTED);
+    Serial.printf("[BT-TX] connection state=%d connected=%d\n", (int)state, s_txConnected);
 }
 
 static bool tx_scan_callback(const char *name, esp_bd_addr_t address, int rssi) {
-    (void)rssi;
     if (!s_scanActive || name == nullptr || name[0] == '\0') return false;
     for (uint8_t i = 0; i < s_scanCount; i++) {
         if (memcmp(s_scanAddrs[i], address, ESP_BD_ADDR_LEN) == 0) return false;
@@ -51,6 +45,7 @@ static bool tx_scan_callback(const char *name, esp_bd_addr_t address, int rssi) 
         s_scanNames[s_scanCount] = String(name);
         memcpy(s_scanAddrs[s_scanCount], address, ESP_BD_ADDR_LEN);
         s_scanCount++;
+        Serial.printf("[BT-TX] found: %s  RSSI: %d\n", name, rssi);
     }
     return false; // we only want discovery results, never auto-connect from here
 }
@@ -70,11 +65,20 @@ static void on_rx_connection_state(esp_a2d_connection_state_t state, void *obj) 
         s_rxPlaying = false;
         s_rxDeviceName = "Menunggu koneksi...";
     }
+    Serial.printf("[BT-RX] connected=%d device=%s\n", s_rxConnected, s_rxDeviceName.c_str());
 }
 
 static void on_rx_audio_state(esp_a2d_audio_state_t state, void *obj) {
     (void)obj;
     s_rxPlaying = (state == ESP_A2D_AUDIO_STATE_STARTED);
+}
+
+// Raw PCM from the phone: 16-bit signed, interleaved stereo. Forward straight
+// to the shared I2S writer (ported from final-form/bt_receiver.cpp's
+// onBtReceiverDataStream).
+static void on_rx_data_stream(const uint8_t *data, uint32_t length) {
+    size_t frameCount = length / 4;  // 2 bytes/sample * 2 channels
+    i2sWriteStereo16(reinterpret_cast<const int16_t *>(data), frameCount);
 }
 
 // --- Role lifecycle ---
@@ -94,7 +98,7 @@ void bt_backend_start_transmitter() {
 
     if (s_hasSavedAddr) s_source.set_auto_reconnect(s_savedAddr, 1);
     s_source.set_on_connection_state_changed(on_tx_connection_state);
-    s_source.start("DAP Transmitter", tx_fill_silence);
+    s_source.start("DAP Transmitter", get_sound_data);
     s_role = BtRole::SOURCE;
 }
 
@@ -104,10 +108,9 @@ void bt_backend_start_receiver() {
 
     s_sink.set_on_connection_state_changed(on_rx_connection_state);
     s_sink.set_on_audio_state_changed(on_rx_audio_state);
-    // No local I2S output exists in this UI-only module (see README.md) --
-    // don't let the library drive hardware it doesn't own; a later pass
-    // forwards the PCM stream to a real decoder/output.
-    s_sink.set_stream_reader(nullptr, false);
+    // false = don't let the library drive its own I2S output; we forward
+    // PCM to i2s_output.cpp ourselves via on_rx_data_stream instead.
+    s_sink.set_stream_reader(on_rx_data_stream, false);
     s_sink.start("DAP Receiver");
     s_role = BtRole::SINK;
 }
@@ -148,7 +151,8 @@ void bt_tx_start_scan() {
     s_source.set_auto_reconnect(false);
     s_source.set_valid_cod_service(ESP_BT_COD_SRVC_RENDERING | ESP_BT_COD_SRVC_AUDIO);
     s_source.set_ssid_callback(tx_scan_callback);
-    esp_bt_gap_start_discovery(ESP_BT_INQ_MODE_GENERAL_INQUIRY, 10, 0);
+    esp_err_t r = esp_bt_gap_start_discovery(ESP_BT_INQ_MODE_GENERAL_INQUIRY, 10, 0);
+    Serial.printf("[BT-TX] scan start result=%d\n", (int)r);
 }
 
 bool bt_tx_scan_active() { return s_scanActive; }

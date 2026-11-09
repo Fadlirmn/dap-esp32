@@ -9,6 +9,7 @@
 #include "wifi_transfer.h"
 #endif
 
+#ifndef KODE_OPTIMASI_SIM
 static lv_obj_t *s_files_lbl = NULL;
 static lv_obj_t *s_status_lbl = NULL;
 
@@ -16,6 +17,7 @@ static void on_screen_deleted(lv_event_t *e) {
     LV_UNUSED(e);
     s_files_lbl = s_status_lbl = NULL;
 }
+#endif
 
 static lv_obj_t *info_card(lv_obj_t *scr, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h) {
     lv_obj_t *card = ui_card_create(scr, x, y, w, h, 16, COLOR_SURFACE);

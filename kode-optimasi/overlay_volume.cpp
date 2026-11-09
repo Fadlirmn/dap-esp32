@@ -3,6 +3,9 @@
 #include "ui_icons.h"
 #include "ui_theme.h"
 #include "display_pins.h"
+#ifndef KODE_OPTIMASI_SIM
+#include "i2s_output.h"
+#endif
 
 static lv_obj_t *s_pill = NULL;
 static lv_timer_t *s_hide_timer = NULL;
@@ -58,4 +61,9 @@ void overlay_volume_adjust(int delta) {
     if (s_volume < 0) s_volume = 0;
     if (s_volume > 100) s_volume = 100;
     overlay_volume_show(s_volume);
+#ifndef KODE_OPTIMASI_SIM
+    // BT Transmitter's output volume is controlled by the receiving speaker,
+    // not us -- this only affects BT Receiver's forwarded audio.
+    i2sOutputSetVolume((uint8_t)(s_volume * 127 / 100));
+#endif
 }

@@ -3,9 +3,10 @@
 //
 // This is the one firmware project in this repo (final-form/ was retired
 // once its subsystems were ported in here). Real: BT A2DP scan/pair
-// (bt_backend.cpp), WiFi AP file transfer (wifi_transfer.cpp). Still
-// demo/static data: Library/Playlists track catalog, and no real
-// audio decode/I2S output or physical button/encoder/touch input yet.
+// (bt_backend.cpp), WiFi AP file transfer (wifi_transfer.cpp), MP3 decode +
+// I2S output (audio_decoder.cpp/i2s_output.cpp). Still demo/static data:
+// Library/Playlists track catalog (see the hardcoded test track in setup()
+// below), and no physical button/encoder/touch input yet.
 //
 // Setup needed before this compiles: see README.md for lv_conf.h placement
 // and the TFT_eSPI_User_Setup.h pin/driver copy step.
@@ -19,6 +20,8 @@
 #include "demo_cycle.h"
 #include "bt_backend.h"
 #include "wifi_transfer.h"
+#include "audio_decoder.h"
+#include "i2s_output.h"
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -57,16 +60,6 @@ static void guiTask(void *pv) {
     }
 }
 
-// Empty skeleton per the brief's FreeRTOS split: real I2S audio decode/output
-// goes here later, pinned to core 0, independent of the GUI task above.
-static void audioTaskStub(void *pv) {
-    LV_UNUSED(pv);
-    for (;;) {
-        // TODO: I2S decode/output pipeline.
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-}
-
 void setup() {
     Serial.begin(115200);
 
@@ -91,8 +84,26 @@ void setup() {
     }
     wifiTransferSetup();
 
+    audioDecoderSetup();
+    i2sOutputSetup();
+    startDecoderTask();
+
+    // ponytail: hardcoded test track standing in for a real file picker --
+    // screen_library.cpp stays demo-data (out of scope here, see its
+    // README), swap this for whatever that picker opens once it's wired up.
+    if (audioFileMutex) xSemaphoreTake(audioFileMutex, portMAX_DELAY);
+    audioFile = SD.open("/tracks/test.mp3", FILE_READ);
+    if (audioFile && !audioFile.isDirectory() && audioFile.size() >= 512) {
+        g_file_size = audioFile.size();
+        g_file_bytes_read = 0;
+        is_playing = true;
+    } else {
+        if (audioFile) audioFile.close();
+        g_file_size = 0;
+    }
+    if (audioFileMutex) xSemaphoreGive(audioFileMutex);
+
     xTaskCreatePinnedToCore(guiTask, "GUI", 10240, NULL, 2, NULL, 1);
-    xTaskCreatePinnedToCore(audioTaskStub, "AudioStub", 4096, NULL, 3, NULL, 0);
 }
 
 void loop() {

@@ -10,9 +10,8 @@
 // sink, same constraint final-form has) -- start_* tears down the other role
 // first if needed.
 //
-// No SD/audio decode exists in this folder (out of scope, see README.md), so
-// the source role streams silence until a later pass wires a real decoder
-// into bt_tx_fill_audio() -- this still lets scanning/pairing work for real.
+// Source role streams real decoded audio via audio_decoder.cpp's
+// get_sound_data(); sink role forwards received PCM to i2s_output.cpp.
 #pragma once
 #include <stdint.h>
 
