@@ -18,18 +18,13 @@ rotary encoder + button UI on an ILI9341 display.
 
 ## Layout
 
-- **`final-form/`** — the firmware. Start here. See `final-form/README.md`
-  for wiring, controls, SD card layout, and build instructions.
-- **`kode-optimasi/`** — standalone LVGL 8.x port of all 12 UI boards (not
-  wired into `final-form/`). Has its own desktop SDL preview (`sim/`) and
-  screenshot gallery — see `kode-optimasi/README.md`.
-- **`old/`** — original/reference material kept for history:
-  - `old/Stream32-ESP-Player.ino` — the original full-feature UI/player this
-    project's feature set was ported from (different hardware: TFT_eSPI +
-    touchscreen).
-  - `old/files/` — this board's real wiring tests (`test_input.ino`), the
-    pinout plan (`plan.md`), case/render assets, and an earlier PlatformIO
-    attempt (`esp32-dap/`).
-  - `old/files.zip` — a zip of `old/files/`, ignored by git (duplicate of
-    already-tracked content).
-- **`docs/`** — porting notes; see `docs/porting-notes.md`.
+- **`kode-optimasi/`** — the firmware, and the only project folder in this
+  repo. LVGL 8.x UI (13 screens) + real BT A2DP source/sink scan/pair/AVRCP,
+  MP3 decode + I2S output, WiFi AP file transfer, physical rotary encoder +
+  3-button input, and XPT2046 touch. Has its own desktop SDL preview
+  (`sim/`) and screenshot gallery — see `kode-optimasi/README.md`.
+
+`final-form/` (the earlier, separate firmware) and the `old/`/
+`dap-ui-landscape/`/`docs/` reference material were retired once their
+functionality was ported into `kode-optimasi/` or superseded by it — still
+in git history if needed, just not in the working tree.

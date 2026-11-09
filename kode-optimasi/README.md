@@ -1,18 +1,22 @@
-# kode-optimasi — LVGL port of the 12-board DAP UI
+# kode-optimasi — the DAP firmware
 
-Standalone LVGL 8.x reimplementation of all 12 screens from
-`../dap-ui-landscape/` (design reference) / `../DAP_UI_landscape_240x320_pixel_export/`
-(pixel export), for an ESP32 DevKit V1 (WROOM-32, **no PSRAM**) driving a
-320×240 landscape SPI TFT (ILI9341 by default; ST7789-compatible) via TFT_eSPI.
+LVGL 8.x UI (13 screens, originally ported from a `dap-ui-landscape/` design
+mockup — since retired, see git history) for an ESP32 DevKit V1 (WROOM-32,
+**no PSRAM**) driving a 320×240 landscape SPI TFT (ILI9341 by default;
+ST7789-compatible) via TFT_eSPI. This is the one firmware project in this
+repo — the earlier, separate `final-form/` firmware was retired once its
+subsystems (listed below) were ported in here.
 
-**Scope**: this is a UI shell with demo/static sample data (the same text the
-mockups themselves use — "Aurora 3:42", "Favorit · 12 lagu", etc). There is no
-SD-card/audio/WiFi backend here and none is wired up. **Classic Bluetooth
-(scan/pair/connect) is real**, see `bt_backend.*` below — but it has no audio
-to actually stream yet (no SD/decoder in this folder), so a connected A2DP
-source sends silence until a later pass wires a real PCM feed in. That
-integration (and WiFi/SD) is a separate, later pass. `../final-form/` is the
-real firmware and is untouched by this folder.
+**Real**: BT A2DP source/sink scan/pair/AVRCP (`bt_backend.*`), MP3 decode +
+I2S output (`audio_decoder.*`/`i2s_output.*`), WiFi AP file transfer
+(`wifi_transfer.*`), physical rotary encoder + 3-button input (`input.*`,
+PREV/NEXT navigate focus, ENC_SW confirms/double-click skips track, rotate =
+volume, MENU jumps to the mode grid), XPT2046 touch (`touch.*`).
+
+**Still demo/static data**: the Library/Playlists track catalog (one
+hardcoded test file opens at boot as a placeholder, see the `ponytail:`
+comment in `kode-optimasi.ino`'s `setup()`) and the header battery
+percentage.
 
 ## Galeri
 
@@ -79,16 +83,17 @@ as the dummy-data gating.
   send real transport commands to the connected phone (`bt_rx_play_pause()`
   etc.) — this needs no local decoder since it's just a remote-control
   signal, same as a BT headset's buttons.
-- **Still a stub**: the source's audio feed is a silence generator
-  (`bt_backend.cpp`'s `tx_fill_silence`, no SD/decoder in this folder yet) and
-  BT Transmitter's own play/pause/prev/next (no local source to control, so
-  they stay demo-only, same as before).
+- **Audio is real too, now**: the source streams `audio_decoder.cpp`'s
+  `get_sound_data()` (SD → minimp3 → PCM) instead of silence; the sink
+  forwards received PCM straight to `i2s_output.cpp`'s DAC output. BT
+  Transmitter's own on-screen play/pause/prev/next still only affect what's
+  displayed (no local playlist to control — see the `ponytail:` placeholder
+  in `kode-optimasi.ino`), but the stream itself is real audio.
 - Verified by actually compiling this folder for `esp32dev` with the BT
-  backend linked in: links cleanly, but overflows the *default* ESP32
-  partition table (classic-BT stack alone is large) — fixed the same way
-  `final-form/` was, `board_build.partitions = huge_app.csv` in
-  `platformio.ini`. With that: **RAM 26.5% (86.7 KB), Flash 52.8% (1.66 MB
-  of 3 MB)**.
+  backend + decoder + WiFi + input all linked in: links cleanly with
+  `board_build.partitions = huge_app.csv` in `platformio.ini` (the default
+  ESP32 partition table is too small for this combined footprint). **RAM
+  35.7% (117 KB), Flash 78.0% (2.45 MB of 3 MB)**.
 
 ## Navigation
 
@@ -130,21 +135,29 @@ Real click-driven navigation (not just the demo data):
   clicked once.
 
 **Still demo-only by design**: the battery percentage (`now_playing_set_battery()`
-is a no-op stub) and anything that would need real SD/audio/WiFi hardware
-(song durations/metadata, transfer progress, etc). BT scan/connect/AVRCP
-*is* real on hardware now — see "Real Bluetooth" above — it's only the sim/
-preview and the actual audio payload that stay demo/silent.
+is a no-op stub) and the Library/Playlists track catalog (one hardcoded test
+file stands in for a real file picker — see the `ponytail:` comment in
+`kode-optimasi.ino`). BT scan/connect/AVRCP/audio, WiFi transfer, and
+physical input are all real on hardware now — see "Real Bluetooth" and
+"On real hardware" above.
 
-**Click handling itself only responds in the desktop `sim/`** (see below) —
-real hardware has no touch/button input device registered yet (not in the
-original brief). The handlers live in the shared screen code, so wiring a
-touch (e.g. XPT2046) or physical-button indev into `kode-optimasi.ino` later
-is all that's needed to make the same clicks work on-device.
+**On real hardware**, the same navigation above works via three input paths,
+all registered in `kode-optimasi.ino`'s `setup()`:
+- Touch (`touch.*`, XPT2046) — a plain `LV_INDEV_TYPE_POINTER`, identical
+  shape to the sim's mouse, so every screen's tap handling above just works
+  with zero screen-side changes.
+- PREV/NEXT/ENC_SW (`input.*`) — an `LV_INDEV_TYPE_ENCODER` feeding a
+  `lv_group` of each screen's buttons/rows (`screen_manager_group()`):
+  PREV/NEXT move focus, ENC_SW confirms (clicks the focused widget, same
+  event as a tap), ENC_SW double-click skips track on the 3 player screens.
+- The rotary encoder's rotation is volume, not focus movement — same
+  `overlay_volume_adjust()` as the sim's mouse wheel.
 
 ## Build setup
 
-1. **Libraries**: `lvgl` (^8.3) and `TFT_eSPI` (^2.5), both installable via the
-   Arduino Library Manager or PlatformIO `lib_deps`.
+1. **Libraries**: `lvgl` (^8.3), `TFT_eSPI` (^2.5), `ESP32-A2DP`, and
+   `XPT2046_Touchscreen`, all installable via the Arduino Library Manager or
+   PlatformIO `lib_deps` (already listed in this folder's `platformio.ini`).
 2. **`lv_conf.h`** (already in this folder):
    - Arduino IDE: install **lvgl via the Arduino Library Manager** (the
      Arduino-packaged build, not the raw GitHub repo) — it auto-detects
@@ -160,19 +173,18 @@ is all that's needed to make the same clicks work on-device.
      `<Arduino/libraries>/TFT_eSPI/User_Setup.h`.
    - PlatformIO: pass the same `#define`s from that file as `build_flags`
      instead — already done in the included `platformio.ini`.
-   - Panel is ILI9341 by default (matches the real hardware this pin layout
-     was copied from, `final-form/pins.h`) — swap `ILI9341_DRIVER` for
-     `ST7789_DRIVER` if your panel is ST7789.
-4. Flash `kode-optimasi.ino` (Arduino IDE) or `pio run -t upload` (PlatformIO —
-   `platformio.ini` sets `src_dir = .` like `final-form/` does). No touch/button
-   input is wired on real hardware yet (see Navigation above), so it just sits
-   on Now Playing with its cosmetic demo timers running.
+   - Panel is ILI9341 by default — swap `ILI9341_DRIVER` for `ST7789_DRIVER`
+     in `platformio.ini`'s `build_flags` if your panel is ST7789.
+4. Flash `kode-optimasi.ino` (Arduino IDE) or `pio run -t upload` (PlatformIO
+   — `platformio.ini` sets `src_dir = .`). Touch and physical encoder/button
+   input are both wired (see "On real hardware" above).
 
 Verified by actually compiling this folder for `esp32dev`/Arduino against real
-`lvgl@8.4.0` + `TFT_eSPI@2.5.43` + `ESP32-A2DP`: links cleanly — **RAM 26.5%
-(86.7 KB), Flash 52.8% (1.66 MB of 3 MB, via `huge_app.csv`)** — confirms the
-no-PSRAM RAM budget holds with all 9 screens + 2 overlays + the real BT
-source/sink backend linked in (only one screen's widgets exist at a time at
+`lvgl@8.4.0` + `TFT_eSPI@2.5.43` + `ESP32-A2DP` + `XPT2046_Touchscreen`: links
+cleanly — **RAM 35.7% (117 KB), Flash 78.0% (2.45 MB of 3 MB, via
+`huge_app.csv`)** — confirms the no-PSRAM RAM budget holds with all 13
+screens + 2 overlays + BT source/sink + MP3 decode/I2S + WiFi transfer +
+physical input all linked in (only one screen's widgets exist at a time at
 runtime, per the lazy screen lifecycle in `screen_manager.cpp`; see "Real
 Bluetooth" above for why `huge_app.csv` is needed). Real on-device flashing is
 still needed to confirm visuals/timing/actual pairing.
@@ -180,7 +192,7 @@ still needed to confirm visuals/timing/actual pairing.
 ## Desktop preview (`sim/`)
 
 `sim/` renders the real, unmodified screen/overlay sources in an SDL2 window
-instead of a TFT panel — same idea as `final-form/sim/`, but against a real
+instead of a TFT panel, against a real
 lvgl checkout (lvgl's C source is compiled as C via `gcc`; mixing it into a
 C++ `g++` build silently miscompiles it — g++ rejects valid C like implicit
 `void*`->`T*` conversions). `cd sim && make sim` (needs network once, to `git
@@ -222,6 +234,6 @@ This caught three real bugs no static review did:
 - `now_playing_set_battery()` is a no-op stub; the header battery is demo-static
   (explicitly out of scope — everything else that looked like a dummy control
   was wired to real, persistent local state instead, see Navigation above).
-- The BT source's audio feed is silence (no SD/decoder in this folder yet) —
-  scanning/pairing/AVRCP are real, streaming actual music isn't, see "Real
-  Bluetooth" above.
+- The Library/Playlists track catalog is one hardcoded test file, not a real
+  SD-card file picker — see the `ponytail:` comment in `kode-optimasi.ino`'s
+  `setup()`.
