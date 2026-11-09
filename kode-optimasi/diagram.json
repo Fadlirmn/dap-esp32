@@ -4,7 +4,14 @@
   "editor": "wokwi",
   "parts": [
     { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
-    { "type": "wokwi-ili9341", "id": "tft", "top": -20, "left": 150, "attrs": {} }
+    { "type": "wokwi-ili9341", "id": "tft", "top": -20, "left": 150, "attrs": {} },
+    { "type": "wokwi-microsd-card", "id": "sd", "top": 150, "left": 0, "attrs": {} },
+    { "type": "wokwi-ky-040", "id": "enc", "top": 150, "left": 150, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btn_prev", "top": 260, "left": 0, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btn_next", "top": 260, "left": 60, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btn_menu", "top": 260, "left": 120, "attrs": {} },
+    { "type": "wokwi-resistor", "id": "r_next", "top": 320, "left": 60, "attrs": { "value": "10000" } },
+    { "type": "wokwi-resistor", "id": "r_menu", "top": 320, "left": 120, "attrs": { "value": "10000" } }
   ],
   "connections": [
     [ "esp:3V3", "tft:VCC", "red", [] ],
@@ -15,6 +22,32 @@
     [ "esp:17", "tft:CS", "orange", [] ],
     [ "esp:27", "tft:D/C", "purple", [] ],
     [ "esp:33", "tft:RESET", "brown", [] ],
-    [ "esp:3V3", "tft:LED", "red", [] ]
+    [ "esp:3V3", "tft:LED", "red", [] ],
+
+    [ "esp:3V3", "sd:VCC", "red", [] ],
+    [ "esp:GND.1", "sd:GND", "black", [] ],
+    [ "esp:18", "sd:SCK", "green", [] ],
+    [ "esp:23", "sd:DI", "blue", [] ],
+    [ "esp:19", "sd:DO", "yellow", [] ],
+    [ "esp:4", "sd:CS", "orange", [] ],
+
+    [ "esp:3V3", "enc:VCC", "red", [] ],
+    [ "esp:GND.1", "enc:GND", "black", [] ],
+    [ "esp:13", "enc:CLK", "green", [] ],
+    [ "esp:14", "enc:DT", "blue", [] ],
+    [ "esp:16", "enc:SW", "orange", [] ],
+
+    [ "btn_prev:1.l", "esp:32", "green", [] ],
+    [ "btn_prev:2.l", "esp:GND.1", "black", [] ],
+
+    [ "btn_next:1.l", "esp:36", "green", [] ],
+    [ "btn_next:2.l", "esp:GND.1", "black", [] ],
+    [ "r_next:1", "esp:36", "yellow", [] ],
+    [ "r_next:2", "esp:3V3", "red", [] ],
+
+    [ "btn_menu:1.l", "esp:39", "green", [] ],
+    [ "btn_menu:2.l", "esp:GND.1", "black", [] ],
+    [ "r_menu:1", "esp:39", "yellow", [] ],
+    [ "r_menu:2", "esp:3V3", "red", [] ]
   ]
 }
