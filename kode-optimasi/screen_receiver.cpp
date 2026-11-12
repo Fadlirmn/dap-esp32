@@ -91,7 +91,7 @@ void screen_receiver_create(lv_obj_t *parent) {
     s_is_playing = bt_rx_is_playing();
 #endif
     lv_obj_t *scr = parent;
-    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "BT Receiver", true, 78);
+    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "BT Receiver", true);
 
     const lv_coord_t card_w = SCREEN_W - 24, card_h = 110;
     lv_obj_t *card = ui_card_create(scr, 12, 30, card_w, card_h, 20, COLOR_BT_HERO);

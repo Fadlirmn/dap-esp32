@@ -12,3 +12,6 @@ void overlay_volume_show(int percent);
 // overlay_volume_show(). delta<0 lowers, delta>0 raises. Wire this to a real
 // input (sim: mouse wheel; hardware: volume buttons) instead of a timer.
 void overlay_volume_adjust(int delta);
+
+// Current level [0,100], e.g. for a settings screen to show/refresh on open.
+int overlay_volume_get(void);

@@ -91,7 +91,7 @@ static lv_obj_t *track_row(lv_obj_t *scr, lv_coord_t x, lv_coord_t y, lv_coord_t
 
 void screen_playlist_detail_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
-    lv_obj_t *header = ui_header_create(scr, LV_SYMBOL_LEFT, "Favorit", true, 78);
+    lv_obj_t *header = ui_header_create(scr, LV_SYMBOL_LEFT, "Favorit", true);
     lv_obj_t *back_area = lv_obj_get_child(header, 0); // the icon+title container (see ui_header_create)
     lv_obj_add_flag(back_area, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(back_area, back_clicked_cb, LV_EVENT_CLICKED, NULL);

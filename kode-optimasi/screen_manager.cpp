@@ -10,6 +10,9 @@
 #include "screen_playlists.h"
 #include "screen_playlist_detail.h"
 #include "screen_bt_devices.h"
+#include "screen_equalizer.h"
+#include "screen_equalizer_custom.h"
+#include "screen_volume.h"
 
 static lv_obj_t *s_root = NULL;   // one persistent screen, loaded exactly once
 static ScreenId s_current = SCREEN_COUNT; // invalid until first show
@@ -28,6 +31,9 @@ static void build_screen(lv_obj_t *root, ScreenId id) {
         case SCREEN_PLAYLIST_DETAIL: screen_playlist_detail_create(root); break;
         case SCREEN_BT_DEVICES_RX:   screen_bt_devices_rx_create(root); break;
         case SCREEN_BT_DEVICES_TX:   screen_bt_devices_tx_create(root); break;
+        case SCREEN_EQUALIZER:       screen_equalizer_create(root); break;
+        case SCREEN_EQUALIZER_CUSTOM: screen_equalizer_custom_create(root); break;
+        case SCREEN_VOLUME:          screen_volume_create(root); break;
         default:                     screen_now_playing_create(root); break;
     }
 }

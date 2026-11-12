@@ -6,6 +6,7 @@
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3.h"
 #include "audio_decoder.h"
+#include "equalizer.h"
 
 #define READ_BUF_SIZE 2048
 #define PCM_QUEUE_SIZE 2048
@@ -70,6 +71,7 @@ void mp3DecoderTask(void *pvParameters) {
 
     uint32_t last_hz = 0;
     uint32_t step = 65536; // Fixed-point resampling step.
+    static EqState eqState = {}; // this task's only stream -- one instance for its lifetime
 
     while (true) {
         if (decoder_reset_requested) {
@@ -132,6 +134,7 @@ void mp3DecoderTask(void *pvParameters) {
                         int32_t s2 = pcm_output_buffer[idx + 1];
                         f.channel1 = f.channel2 = s1 + (((s2 - s1) * (int32_t)frac) >> 16);
                     }
+                    equalizerProcess(&eqState, &f.channel1, &f.channel2);
                     xQueueSend(pcm_frame_queue, &f, portMAX_DELAY);
                     acc += step;
                 }
@@ -144,6 +147,7 @@ void mp3DecoderTask(void *pvParameters) {
                     } else {
                         f.channel1 = f.channel2 = pcm_output_buffer[i];
                     }
+                    equalizerProcess(&eqState, &f.channel1, &f.channel2);
                     xQueueSend(pcm_frame_queue, &f, portMAX_DELAY);
                 }
             }

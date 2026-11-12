@@ -56,6 +56,8 @@ void overlay_volume_show(int percent) {
     lv_timer_set_repeat_count(s_hide_timer, 1);
 }
 
+int overlay_volume_get(void) { return s_volume; }
+
 void overlay_volume_adjust(int delta) {
     s_volume += delta;
     if (s_volume < 0) s_volume = 0;

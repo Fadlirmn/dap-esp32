@@ -37,7 +37,7 @@ static lv_obj_t *card_line(lv_obj_t *card, const char *text, lv_color_t color, c
 
 void screen_transfer_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
-    ui_header_create(scr, LV_SYMBOL_UPLOAD, "Transfer File", true, 78);
+    ui_header_create(scr, LV_SYMBOL_UPLOAD, "Transfer File", true);
 
     lv_obj_t *hotspot = info_card(scr, 12, 32, 150, 52);
     card_line(hotspot, "Hotspot ESP32", COLOR_TEXT_MUTED, FONT_SMALL);

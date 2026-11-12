@@ -80,7 +80,7 @@ static void on_screen_deleted(lv_event_t *e) {
 
 void screen_transmitter_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
-    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "BT Transmitter", true, 78);
+    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "BT Transmitter", true);
 
     const lv_coord_t card_w = SCREEN_W - 24, card_h = 92;
     lv_obj_t *card = ui_card_create(scr, 12, 30, card_w, card_h, 20, COLOR_BT_HERO);

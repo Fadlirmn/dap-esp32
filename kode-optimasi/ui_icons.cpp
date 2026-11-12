@@ -9,29 +9,6 @@ lv_obj_t *icon_symbol(lv_obj_t *parent, const char *symbol, lv_color_t color, co
     return label;
 }
 
-lv_obj_t *icon_battery(lv_obj_t *parent, int percent) {
-    lv_obj_t *row = lv_obj_create(parent);
-    lv_obj_remove_style_all(row);
-    lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_column(row, 3, 0);
-
-    const char *glyph = percent > 80 ? LV_SYMBOL_BATTERY_FULL
-                       : percent > 55 ? LV_SYMBOL_BATTERY_3
-                       : percent > 30 ? LV_SYMBOL_BATTERY_2
-                       : percent > 15 ? LV_SYMBOL_BATTERY_1
-                       : LV_SYMBOL_BATTERY_EMPTY;
-    lv_color_t color = percent <= 15 ? COLOR_ERROR : COLOR_TEXT_MUTED;
-
-    icon_symbol(row, glyph, color, FONT_SMALL);
-
-    lv_obj_t *pct = lv_label_create(row);
-    lv_label_set_text_fmt(pct, "%d%%", percent);
-    lv_obj_set_style_text_color(pct, color, 0);
-    lv_obj_set_style_text_font(pct, FONT_SMALL, 0);
-    return row;
-}
-
 lv_obj_t *icon_connected_badge(lv_obj_t *parent) {
     lv_obj_t *badge = lv_obj_create(parent);
     lv_obj_remove_style_all(badge);

@@ -45,7 +45,7 @@ static void make_tile(lv_obj_t *scr, lv_coord_t x, lv_coord_t y, lv_coord_t w, l
 
 void screen_menu_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
-    ui_header_create(scr, NULL, "Menu", false, 78);
+    ui_header_create(scr, NULL, "Menu", false);
 
     const lv_coord_t w = (SCREEN_W - 16 - 6) / 2, h = 40;
     const lv_coord_t x0 = 8, x1 = x0 + w + 6;
@@ -58,6 +58,7 @@ void screen_menu_create(lv_obj_t *parent) {
     make_tile(scr, x0, y0 + 2 * row_step, w, h, false, LV_SYMBOL_BLUETOOTH, "BT Transmitter", NULL, SCREEN_BT_DEVICES_TX);
     make_tile(scr, x1, y0 + 2 * row_step, w, h, false, LV_SYMBOL_UPLOAD, "Transfer File", NULL, SCREEN_TRANSFER);
     make_tile(scr, x0, y0 + 3 * row_step, w, h, false, LV_SYMBOL_LEFT, "Kembali", NULL, SCREEN_NOW_PLAYING);
+    make_tile(scr, x1, y0 + 3 * row_step, w, h, false, LV_SYMBOL_SETTINGS, "Equalizer", NULL, SCREEN_EQUALIZER);
 
     ui_footer_create(scr, "Klik: OK - MENU: kembali");
 }

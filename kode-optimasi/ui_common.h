@@ -9,8 +9,10 @@
 lv_obj_t *ui_screen_create(void);
 
 // header_icon may be NULL (e.g. the Menu screen's plain title, no icon/no MENU pill).
+// The right side always shows the live volume level (click -> SCREEN_VOLUME),
+// replacing what used to be a battery readout with no real battery to read.
 lv_obj_t *ui_header_create(lv_obj_t *screen, const char *header_icon, const char *title,
-                            bool show_menu_badge, int battery_percent);
+                            bool show_menu_badge);
 
 lv_obj_t *ui_footer_create(lv_obj_t *screen, const char *hint_text);
 

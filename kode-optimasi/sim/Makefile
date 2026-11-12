@@ -26,7 +26,8 @@ APP_SRCS = sim_main.cpp \
     ../screen_menu.cpp ../screen_receiver.cpp ../screen_transmitter.cpp \
     ../screen_transfer.cpp ../screen_switch.cpp ../screen_playlists.cpp \
     ../screen_playlist_detail.cpp ../overlay_volume.cpp ../overlay_alert.cpp \
-    ../screen_bt_devices.cpp
+    ../screen_bt_devices.cpp ../screen_equalizer.cpp ../screen_equalizer_custom.cpp ../equalizer.cpp \
+    ../screen_volume.cpp
 APP_OBJS = $(APP_SRCS:.cpp=.o)
 LVGL_OBJS = $(patsubst %.c,%.o,$(shell find $(LVGL_DIR)/src -name '*.c' 2>/dev/null))
 

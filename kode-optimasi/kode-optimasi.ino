@@ -24,6 +24,7 @@
 #include "wifi_transfer.h"
 #include "audio_decoder.h"
 #include "i2s_output.h"
+#include "equalizer.h"
 #include "input.h"
 #include "touch.h"
 
@@ -99,6 +100,7 @@ void setup() {
     }
     wifiTransferSetup();
 
+    equalizerInit();
     audioDecoderSetup();
     i2sOutputSetup();
     startDecoderTask();

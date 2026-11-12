@@ -1,10 +1,11 @@
 // "Pilih Perangkat" -- shared screen *name* for both BT Receiver and
 // Transmitter, but the real-hardware behavior genuinely differs by role (see
 // bt_backend.h): a sink (Receiver) is passive -- the phone connects to it,
-// there's nothing to pick from a list -- while a source (Transmitter)
-// actively scans, so it gets a real "Scan" button + live result list.
-// The sim/ preview keeps one shared dummy-list layout for both (cosmetic
-// only, no real BT exists there).
+// there's nothing to pick from a list, so no Scan button -- while a source
+// (Transmitter) actively scans, so it gets a real "Scan" button + live
+// result list. The sim/ preview below mirrors that split with a fake 10s-free
+// scan (Scan reveals a canned dummy list) and a status-only RX, since there's
+// no real BT radio to drive here.
 #include "screen_bt_devices.h"
 #include "ui_common.h"
 #include "ui_icons.h"
@@ -18,68 +19,76 @@
 
 #ifdef KODE_OPTIMASI_SIM
 struct BtDevice { const char *name; };
-// RX: phones that have paired with this ESP32 before (it's the one being
-// streamed to, so "devices" here means "previously-paired senders").
-static const BtDevice kRxDevices[] = {
-    {"Pixel 7 - Fadli"},
-    {"iPhone - Sarah"},
-    {"Laptop Kerja"},
-};
-// TX: speakers nearby that this ESP32 (as the source) can stream out to.
+// Speakers nearby that this ESP32 (as the source) can stream out to --
+// revealed by pressing Scan, same two-step flow as the real scan below.
 static const BtDevice kTxDevices[] = {
     {"JBL Flip 6"},
     {"Sony SRS-XB13"},
     {"Speaker Mobil"},
 };
-#define RX_COUNT (int)(sizeof(kRxDevices) / sizeof(kRxDevices[0]))
 #define TX_COUNT (int)(sizeof(kTxDevices) / sizeof(kTxDevices[0]))
 
-static void rx_row_clicked_cb(lv_event_t *e) {
-    LV_UNUSED(e);
-    screen_manager_show(SCREEN_RECEIVER);
-}
+static bool s_tx_scanned = false; // sim-only stand-in for bt_tx_scan_active()/_count()
 
 static void tx_row_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
     screen_manager_show(SCREEN_TRANSMITTER);
 }
 
-static lv_obj_t *create(lv_obj_t *scr, const char *title, const BtDevice *devices, int count,
-                         lv_event_cb_t row_clicked_cb, const char *empty_msg) {
-    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, title, true, 78);
+static void tx_scan_btn_clicked_cb(lv_event_t *e) {
+    LV_UNUSED(e);
+    s_tx_scanned = true;
+    screen_manager_show(SCREEN_BT_DEVICES_TX); // rebuild with the now-revealed list
+}
 
-    if (count == 0) {
-        lv_obj_t *empty = lv_label_create(scr);
-        lv_label_set_text(empty, empty_msg);
-        lv_obj_set_style_text_color(empty, COLOR_TEXT_MUTED, 0);
-        lv_obj_set_style_text_font(empty, FONT_BODY, 0);
-        lv_obj_center(empty);
+lv_obj_t *screen_bt_devices_rx_create(lv_obj_t *parent) {
+    lv_obj_t *scr = parent;
+    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "Pilih Perangkat", true);
+
+    lv_obj_t *status = lv_label_create(scr);
+    lv_label_set_text(status, "Menunggu ponsel terhubung...");
+    lv_obj_set_style_text_color(status, COLOR_TEXT_MUTED, 0);
+    lv_obj_set_style_text_font(status, FONT_BODY, 0);
+    lv_obj_center(status);
+
+    ui_footer_create(scr, "Sink BT pasif - ponsel yang menghubungkan - MENU kembali");
+    return scr;
+}
+
+lv_obj_t *screen_bt_devices_tx_create(lv_obj_t *parent) {
+    lv_obj_t *scr = parent;
+    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "Pilih Perangkat", true);
+
+    lv_obj_t *scan_btn = ui_button_create(scr, SCREEN_W - 86, 30, 70, 26, RADIUS_BUTTON_LG, COLOR_ACCENT);
+    lv_obj_t *scan_lbl = lv_label_create(scan_btn);
+    lv_label_set_text(scan_lbl, "Scan");
+    lv_obj_set_style_text_color(scan_lbl, COLOR_ACCENT_TEXT, 0);
+    lv_obj_set_style_text_font(scan_lbl, FONT_SMALL, 0);
+    lv_obj_center(scan_lbl);
+    lv_obj_add_event_cb(scan_btn, tx_scan_btn_clicked_cb, LV_EVENT_CLICKED, NULL);
+
+    if (!s_tx_scanned) {
+        lv_obj_t *hint = lv_label_create(scr);
+        lv_label_set_text(hint, "Tekan Scan untuk mencari speaker");
+        lv_obj_set_style_text_color(hint, COLOR_TEXT_MUTED, 0);
+        lv_obj_set_style_text_font(hint, FONT_SMALL, 0);
+        lv_obj_set_pos(hint, 12, 36);
         ui_footer_create(scr, "MENU: kembali");
         return scr;
     }
 
-    const lv_coord_t row_h = 32, row_gap = 4, first_y = 30;
-    for (int i = 0; i < count; i++) {
+    const lv_coord_t row_h = 32, row_gap = 4, first_y = 58;
+    for (int i = 0; i < TX_COUNT; i++) {
         lv_obj_t *row = ui_list_row_create(scr, first_y + i * (row_h + row_gap), row_h, false);
         lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(row, row_clicked_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_event_cb(row, tx_row_clicked_cb, LV_EVENT_CLICKED, NULL);
         lv_group_add_obj(screen_manager_group(), row);
         icon_symbol(row, LV_SYMBOL_BLUETOOTH, COLOR_ACCENT, FONT_SMALL);
-        ui_row_text_create(row, devices[i].name, "");
+        ui_row_text_create(row, kTxDevices[i].name, "");
     }
 
     ui_footer_create(scr, "Klik untuk hubungkan - MENU kembali");
     return scr;
-}
-
-lv_obj_t *screen_bt_devices_rx_create(lv_obj_t *parent) {
-    return create(parent, "Pilih Perangkat", kRxDevices, RX_COUNT, rx_row_clicked_cb,
-                   "Tidak ada perangkat yang pernah terhubung");
-}
-
-lv_obj_t *screen_bt_devices_tx_create(lv_obj_t *parent) {
-    return create(parent, "Pilih Perangkat", kTxDevices, TX_COUNT, tx_row_clicked_cb,
-                   "Tidak ada speaker ditemukan");
 }
 
 #else // real hardware: RX = status-only, TX = real scan
@@ -93,7 +102,7 @@ static void rx_forget_btn_clicked_cb(lv_event_t *e) {
 lv_obj_t *screen_bt_devices_rx_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
     bt_backend_start_receiver(); // idempotent -- becomes the sink if not already
-    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "Pilih Perangkat", true, 78);
+    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "Pilih Perangkat", true);
 
     lv_obj_t *status = lv_label_create(scr);
     bool connected = bt_rx_connected();
@@ -180,7 +189,7 @@ static void on_tx_screen_deleted(lv_event_t *e) {
 lv_obj_t *screen_bt_devices_tx_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
     bt_backend_start_transmitter(); // idempotent -- becomes the source if not already
-    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "Pilih Perangkat", true, 78);
+    ui_header_create(scr, LV_SYMBOL_BLUETOOTH, "Pilih Perangkat", true);
 
     lv_obj_t *scan_btn = ui_button_create(scr, SCREEN_W - 86, 30, 70, 26, RADIUS_BUTTON_LG, COLOR_ACCENT);
     lv_obj_t *scan_lbl = lv_label_create(scan_btn);

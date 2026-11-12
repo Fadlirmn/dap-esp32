@@ -106,7 +106,7 @@ void screen_library_create(lv_obj_t *parent) {
     scan_tracks_once();
 #endif
     lv_obj_t *scr = parent;
-    ui_header_create(scr, LV_SYMBOL_LIST, "Daftar Lagu", true, 78);
+    ui_header_create(scr, LV_SYMBOL_LIST, "Daftar Lagu", true);
 
     if (SONG_COUNT == 0) {
         // No catalog loaded (real build) -- PAGE_COUNT would be 0 here, so

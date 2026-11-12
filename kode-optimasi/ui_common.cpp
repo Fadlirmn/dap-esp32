@@ -3,10 +3,16 @@
 #include "ui_icons.h"
 #include "display_pins.h"
 #include "screen_manager.h"
+#include "overlay_volume.h"
 
 static void menu_badge_clicked_cb(lv_event_t *e) {
     LV_UNUSED(e);
     screen_manager_show(SCREEN_MENU);
+}
+
+static void vol_badge_clicked_cb(lv_event_t *e) {
+    LV_UNUSED(e);
+    screen_manager_show(SCREEN_VOLUME);
 }
 
 lv_obj_t *ui_screen_create(void) {
@@ -20,7 +26,7 @@ lv_obj_t *ui_screen_create(void) {
 }
 
 lv_obj_t *ui_header_create(lv_obj_t *screen, const char *header_icon, const char *title,
-                            bool show_menu_badge, int battery_percent) {
+                            bool show_menu_badge) {
     lv_obj_t *bar = lv_obj_create(screen);
     lv_obj_remove_style_all(bar);
     lv_obj_set_size(bar, SCREEN_W, HEADER_H);
@@ -77,7 +83,31 @@ lv_obj_t *ui_header_create(lv_obj_t *screen, const char *header_icon, const char
         lv_group_add_obj(screen_manager_group(), badge); // reachable via PREV/NEXT on every screen that has it
     }
 
-    icon_battery(right, battery_percent);
+    // Was icon_battery(right, battery_percent) -- battery_percent was always
+    // a hardcoded 78 at every call site (no real battery ADC exists), so
+    // this slot is repurposed for the real, live volume level instead.
+    int vol = overlay_volume_get();
+    lv_obj_t *vol_row = lv_obj_create(right);
+    lv_obj_remove_style_all(vol_row);
+    lv_obj_set_size(vol_row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(vol_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(vol_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(vol_row, 3, 0);
+    lv_obj_clear_flag(vol_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    const char *vol_glyph = vol <= 0 ? LV_SYMBOL_MUTE : vol <= 50 ? LV_SYMBOL_VOLUME_MID : LV_SYMBOL_VOLUME_MAX;
+    lv_color_t vol_color = vol <= 0 ? COLOR_ERROR : COLOR_TEXT_MUTED;
+    icon_symbol(vol_row, vol_glyph, vol_color, FONT_SMALL);
+    lv_obj_t *vol_pct = lv_label_create(vol_row);
+    lv_label_set_text_fmt(vol_pct, "%d%%", vol);
+    lv_obj_set_style_text_color(vol_pct, vol_color, 0);
+    lv_obj_set_style_text_font(vol_pct, FONT_SMALL, 0);
+
+    lv_obj_add_flag(vol_row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(vol_row, vol_badge_clicked_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_style_bg_opa(vol_row, LV_OPA_60, LV_STATE_PRESSED); // press feedback, see ui_button_create
+    lv_group_add_obj(screen_manager_group(), vol_row);
+
     return bar;
 }
 

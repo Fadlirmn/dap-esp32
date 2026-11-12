@@ -7,6 +7,7 @@
 #include <driver/i2s.h>
 #include "i2s_output.h"
 #include "display_pins.h"
+#include "equalizer.h"
 
 static volatile uint8_t gVolume = 127;
 
@@ -42,6 +43,7 @@ void i2sWriteStereo16(const int16_t *interleavedLR, size_t frameCount) {
     uint8_t vol = gVolume;
     const size_t CHUNK_FRAMES = 256;  // 256 frames * 2ch * 2B = 1KB, well under stack budget
     int16_t buf[CHUNK_FRAMES * 2];
+    static EqState eqState = {}; // BT Receiver's one forwarded stream -- single instance for its lifetime
 
     size_t done = 0;
     while (done < frameCount) {
@@ -53,6 +55,9 @@ void i2sWriteStereo16(const int16_t *interleavedLR, size_t frameCount) {
             if (scaled > INT16_MAX) scaled = INT16_MAX;
             if (scaled < INT16_MIN) scaled = INT16_MIN;
             buf[i] = (int16_t)scaled;
+        }
+        for (size_t i = 0; i < chunk; i++) {
+            equalizerProcess(&eqState, &buf[i * 2], &buf[i * 2 + 1]);
         }
 
         size_t bytes_written = 0;

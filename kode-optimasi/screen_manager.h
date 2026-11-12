@@ -18,6 +18,9 @@ typedef enum {
     SCREEN_PLAYLIST_DETAIL,
     SCREEN_BT_DEVICES_RX, // "pilih perangkat" before BT Receiver -- new, not one of the original 12 boards
     SCREEN_BT_DEVICES_TX, // same screen/logic, reused for BT Transmitter's device list
+    SCREEN_EQUALIZER,        // EQ preset picker -- new, not one of the original 12 boards
+    SCREEN_EQUALIZER_CUSTOM, // band editor for the active preset, reached from SCREEN_EQUALIZER's gear button
+    SCREEN_VOLUME,           // volume settings, reached from the header's volume badge (opposite the home badge)
     SCREEN_COUNT
 } ScreenId;
 

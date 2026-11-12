@@ -35,7 +35,7 @@ static const Playlist kPlaylists[] = {
 
 void screen_playlists_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
-    ui_header_create(scr, LV_SYMBOL_AUDIO, "Playlist", true, 78);
+    ui_header_create(scr, LV_SYMBOL_AUDIO, "Playlist", true);
 
     const lv_coord_t row_h = 32, row_gap = 4, first_y = 30;
     for (size_t i = 0; i < sizeof(kPlaylists) / sizeof(kPlaylists[0]); i++) {

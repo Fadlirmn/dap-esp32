@@ -9,6 +9,7 @@
 #include "screen_manager.h"
 #include "demo_cycle.h"
 #include "overlay_volume.h"
+#include "equalizer.h"
 
 #define ZOOM 2
 
@@ -61,6 +62,7 @@ int main(int argc, char **argv) {
     indev_drv.read_cb = mouse_read_cb;
     lv_indev_drv_register(&indev_drv);
 
+    equalizerInit();
     screen_manager_init(SCREEN_NOW_PLAYING);
     demo_cycle_init();
 

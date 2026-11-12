@@ -11,9 +11,6 @@
 // Plain glyph label, e.g. icon_symbol(parent, LV_SYMBOL_PLAY, COLOR_ACCENT_TEXT, FONT_BODY).
 lv_obj_t *icon_symbol(lv_obj_t *parent, const char *symbol, lv_color_t color, const lv_font_t *font);
 
-// Battery glyph (auto-picks LV_SYMBOL_BATTERY_FULL..EMPTY by percent, red under 15%) + "NN%" label.
-lv_obj_t *icon_battery(lv_obj_t *parent, int percent);
-
 // Small green circle + white checkmark, as used on BT Receiver/Transmitter hero cards.
 lv_obj_t *icon_connected_badge(lv_obj_t *parent);
 

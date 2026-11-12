@@ -86,7 +86,7 @@ static void next_clicked_cb(lv_event_t *e) {
 void screen_now_playing_create(lv_obj_t *parent) {
     lv_obj_t *scr = parent;
 
-    ui_header_create(scr, NULL, "Local Player", true, 78);
+    ui_header_create(scr, NULL, "Local Player", true);
 
     const lv_coord_t card_x = 12, card_y = 30, card_w = SCREEN_W - 24, card_h = 92;
     lv_obj_t *card = ui_card_create(scr, card_x, card_y, card_w, card_h, RADIUS_CARD, COLOR_CARD_BLUE);
